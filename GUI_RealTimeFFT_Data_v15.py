@@ -38,9 +38,17 @@ class RealtimePlotApp(ctk.CTk):
         self.topFiveFftFreqs = ""
         self.topFiveFftAmp = ""
         self.file_date_str= ""
+        self.rms_value = 0.0
+        self.base_freq = 0
+        self.base_amp = 0
+        self.max_freq = 0
+        self.max_amp = 0
+        self.percent_diff = 0
+
 
         # 建立圖表
-        self.fig, (self.ax_time, self.ax_freq) = plt.subplots(2, 1, figsize=(6, 6))
+        #self.fig, (self.ax_time, self.ax_freq) = plt.subplots(2, 1, figsize=(6, 6))
+        self.fig, (self.ax_time, self.ax_freq, self.ax_energy) = plt.subplots(3, 1, figsize=(6, 6))
         self.ax_time.set_title("時域訊號")
         self.ax_time.set_xlabel("時間(秒)")
         self.ax_time.set_ylabel("三軸RMS數值")
@@ -48,6 +56,13 @@ class RealtimePlotApp(ctk.CTk):
         self.ax_freq.set_title("頻域(FFT)訊號")
         self.ax_freq.set_xlabel("頻率(Hz)")
         self.ax_freq.set_ylabel("振幅")
+        ###  0515 新增
+        self.ax_energy.set_title("第三張圖")
+        self.ax_energy.set_xlabel("X軸標籤")
+        self.ax_energy.set_ylabel("Y軸標籤")
+
+        ###
+        
 
         self.fig.tight_layout()
         ##
@@ -200,7 +215,7 @@ class RealtimePlotApp(ctk.CTk):
             self.ax_time.relim()
             self.ax_time.autoscale_view()
 
-            self.ax_freq.clear()
+            #self.ax_freq.clear()
             self.compute_and_plot_fft()
             self.show_fft_top()
 
@@ -248,6 +263,8 @@ class RealtimePlotApp(ctk.CTk):
             summary_entry['最大頻率_Hz'] = getattr(self, 'max_freq', None)
             summary_entry['最大振幅'] = getattr(self, 'max_amp', None)
             summary_entry['最大與基頻振幅差異_%'] = getattr(self, 'percent_diff', None)
+            summary_entry['每天的rms']= getattr(self, 'rms_value', None)
+            
 
             self.summary_data.append(summary_entry)
             ###
@@ -319,9 +336,9 @@ class RealtimePlotApp(ctk.CTk):
                 print("錯誤：CSV 檔案缺少 Xaxis、Yaxis 或 Zaxis 欄位")
                 return
             ####
-            print(f"沒轉數值load csv_print(self.df['Xaxis']:{self.df['Xaxis'].head(10)}")
-            print(f"沒轉數值load csv_print(self.df['yaxis']:{self.df['Yaxis'].head(10)}")
-            print(f"沒轉數值load csv_print(self.df['zaxis']:{self.df['Zaxis'].head(10)}")
+            #print(f"沒轉數值load csv_print(self.df['Xaxis']:{self.df['Xaxis'].head(10)}")
+            #print(f"沒轉數值load csv_print(self.df['yaxis']:{self.df['Yaxis'].head(10)}")
+            #print(f"沒轉數值load csv_print(self.df['zaxis']:{self.df['Zaxis'].head(10)}")
             ####
             # 將欄位轉為數值型態
             self.df['Xaxis'] = pd.to_numeric(self.df['Xaxis'], errors='coerce')
@@ -330,31 +347,56 @@ class RealtimePlotApp(ctk.CTk):
             self.df = self.df.dropna(subset=['Xaxis', 'Yaxis', 'Zaxis'])
 
             ###
-            print(f"load csv_print(self.df['Xaxis']:{self.df['Xaxis'].head(10)}")
-            print(f"load csv_print(self.df['yaxis']:{self.df['Yaxis'].head(10)}")
-            print(f"load csv_print(self.df['zaxis']:{self.df['Zaxis'].head(10)}")
+            #print(f"load csv_print(self.df['Xaxis']:{self.df['Xaxis'].head(10)}")
+            #print(f"load csv_print(self.df['yaxis']:{self.df['Yaxis'].head(10)}")
+            #print(f"load csv_print(self.df['zaxis']:{self.df['Zaxis'].head(10)}")
             ###
 
             # 計算 RMS = sqrt(Xaxis² + Yaxis² + Zaxis²)
             rms = np.sqrt(self.df['Xaxis']**2 + self.df['Yaxis']**2 + self.df['Zaxis']**2)
-            self.y_data = rms.tolist()
+
+            # 計算每個時間點的合成加速度大小
+            acceleration_magnitude = np.sqrt(self.df['Xaxis']**2 + self.df['Yaxis']**2 + self.df['Zaxis']**2)
+            print(f"acceleration_magnitude:{ acceleration_magnitude[0:10]}")
+            #這段程式碼的確只是在每一個時間點上，將 X、Y、Z 三個軸的加速度分量平方並相加，再開根號。
+            #這會給你每一個時間點的「合成加速度」，即一個向量的大小。但這並不是 RMS 的計算方法。
+            #23:00:06:0001	654	243	-487   427716+59049+237169=723934 ==>開根號  rms=850.84
+            self.y_data = acceleration_magnitude.tolist()#有85932多筆accTotal合成加速度
+            print(f"length  self.y_data:{ len(self.y_data)}")#85932
+            print(f"self.y_data:{ self.y_data[0:10]}")
+            print(f"self.y_data list type:{type(self.y_data)}")
+            #self.y_data = rms.tolist()#有85932多筆accTotal合成加速度 的資料
+            #self.y_data=[1, 2, 3]
+            self.y_data_array = np.array(self.y_data)
+            # 計算 RMS 值
+            self.rms_value = 0.0
+            self.rms_value = np.sqrt(np.mean(self.y_data_array**2)) #把一天裡的85932筆合成加速度 算出來一個rms, 一天只會有一個rms
+
+            # 輸出結果
+            print("每個時間點的合成加速度頭十筆: ",acceleration_magnitude[0:10])
+            rms_result=f"RMS 值 :{self.rms_value}\n"
+            #RMS 持續升高 → 表示馬達振動強度變大 → 代表健康狀況可能正在惡化
+            #self.analysis_result = f"基頻: {base_freq:.2f} Hz，基頻振幅: {base_amp:.2f}\n"
+            print("RMS 值 : ", self.rms_value)
+            self.csv_textbox.delete(1.0, ctk.END)
+            self.csv_textbox.insert(ctk.END, rms_result)
 
             # 固定時間軸 X
             sample_count = min(len(self.y_data), 85932)
             self.x_data = np.round(0.000128008 + 0.000128 * np.arange(sample_count), 9).tolist()
             self.y_data = self.y_data[:sample_count]
-            print(f"LOAD CSV y_data  RMS :{self.y_data[0:10]}")
+            print(f"LOAD CSV y_data  合成加速度(不是RMS) :{self.y_data[0:10]}")
 
             self.ax_time.clear()
-            self.ax_time.plot(self.x_data, self.y_data, label="數據")
+            self.ax_time.plot(self.x_data, self.y_data, label="數據")  #self.y_data裡面有85932筆accTotal合成加速度
             self.ax_time.set_title("時域訊號")
             self.ax_time.set_xlabel("時間(秒)")
-            self.ax_time.set_ylabel("三軸RMS數值")
+            self.ax_time.set_ylabel("accTotal合成加速度數值")
             self.ax_time.legend()
             self.ax_time.relim()
             self.ax_time.autoscale_view()
 
-            self.ax_freq.clear()
+            # self.ax_freq.clear()
             self.compute_and_plot_fft()
 
             #self.canvas.draw()
@@ -363,56 +405,56 @@ class RealtimePlotApp(ctk.CTk):
             self.show_fft_top()
 
     def compute_and_plot_fft(self):
+        self.ax_freq.clear()
+        self.ax_energy.clear()
         if len(self.y_data) < 2:
             return
 
-        signal_fft = np.fft.fft(self.y_data)#算出震幅
-        print(f"self.x_data[1]:{self.x_data[1]},self.x_data[0]:{self.x_data[0]}")
-        dt = self.x_data[1] - self.x_data[0]
-        print(f"dt:{dt}")
+        # FFT計算
+        ##self.y_data裡面有85932筆accTotal合成加速度
+        signal_fft = np.fft.fft(self.y_data)  # 計算震幅
+        print(f"signal_fft:{signal_fft}")# 有實數和虛數  1.27685987e+08      +0.j         1.31985116e+05 -358696.95646056j...
+        print(f"length signal_fft:{len(signal_fft)}")#85932
+        dt = self.x_data[1] - self.x_data[0]  # 時間間隔
+        print(f"dt:{dt}")#0.000128
         frequencies_fft = np.fft.fftfreq(len(self.y_data), dt)
+        #頻率解析度 Δf 是什麼？
+        #Δf 是 FFT 頻率軸中每一個頻點之間的間距（單位是 Hz）
+        #代表你能夠區分多細的頻率變化
+        #Δf=fs/N
+        print(f"frequencies_fft:{frequencies_fft}")# 0.          0.09091491  0.18182982    ==>Δf= fs/N,  Δf:頻率解析度(FFT 頻率軸每一階的差距),N:資料點數  ,fs:採樣頻率
+        print(f"len frequencies_fft:{len(frequencies_fft)}") #85932
         magnitude = np.abs(signal_fft)
+        print(f"magnitude:{magnitude}")#[1.27685987e+08 3.82208814e+05 9.11414374e+05...
+        print(f"len magnitude:{len(magnitude)}") #85932
 
-        positive_frequencies = frequencies_fft[:len(frequencies_fft)//2]
-        positive_magnitude = magnitude[:len(magnitude)//2]
+        # 只選擇正頻率
+        positive_frequencies = frequencies_fft[:len(frequencies_fft) // 2]
+        positive_magnitude = magnitude[:len(magnitude) // 2]
 
+        # 找出峰值
         peaks, _ = find_peaks(positive_magnitude, height=0)
         peak_frequencies = positive_frequencies[peaks]
         peak_magnitudes = positive_magnitude[peaks]
 
         # 儲存前 5 大峰值頻率和幅度
-        sorted_indices = np.argsort(peak_magnitudes)[-5:][::-1]  # 排序並取最大5個
+        sorted_indices = np.argsort(peak_magnitudes)[-5:][::-1]
         self.top_frequencies = peak_frequencies[sorted_indices]
         self.top_magnitudes = peak_magnitudes[sorted_indices]
 
+        # 繪製頻域圖（FFT）
         self.ax_freq.plot(positive_frequencies, positive_magnitude, label="FFT 結果")
         self.ax_freq.scatter(self.top_frequencies, self.top_magnitudes, color='red', label="前 5 大峰值")
-        ###
-        # 加上標註前 5 大峰值
+
+        # 標註前 5 大峰值
         colors = ['blue', 'green', 'orange', 'purple', 'brown']
         for i in range(len(self.top_frequencies)):
             freq = self.top_frequencies[i]
             mag = self.top_magnitudes[i]
             label = f"第{i+1}峰值{freq:.2f} Hz"
-            #label = f"第{i+1}"
-            
-            # 根據頻率位置動態調整標註位置
-            #x_offset = 500 if freq < max(positive_frequencies) - 20 else -30
-            x_offset = freq*2 if freq*3< max(positive_frequencies)  else 100
-            #print(f"max(positive_frequencies) :{max(positive_frequencies) }")
-            #y_offset = mag * 1.2 if mag < 5e7*5 else mag*1.1
-            #y_offset = mag * 0.6 if mag < 5e7 else mag*0.1
-            #y_offset = mag * 0.3+freq*50000 if freq*4 < max(positive_frequencies)  else mag * 0.3
-            if freq * 3 < max(positive_frequencies):
-                #y_offset = mag * 0.2+freq * 50000
-                y_offset = mag *1
-                #print(f"頻率 y_offset = mag * 0.3 + freq * 50000")
-            else:
-                y_offset = mag * 1
-                print(f"頻率 {freq:.2f} 超過界限，僅使用基本 y_offset={y_offset:.2f}")
-            print(f"mag:{mag}")
-            #y_offset = 5e7  # 避免重疊可微調此值
-            
+
+            x_offset = freq * 2 if freq * 3 < max(positive_frequencies) else 100
+            y_offset = mag * 1
             self.ax_freq.annotate(
                 label,
                 xy=(freq, mag),
@@ -421,36 +463,62 @@ class RealtimePlotApp(ctk.CTk):
                 fontsize=9,
                 color=colors[i % len(colors)]
             )
-        ###
+
         self.ax_freq.set_title("頻域(FFT)訊號")
         self.ax_freq.set_xlabel("頻率(Hz)")
         self.ax_freq.set_ylabel("振幅")
         self.ax_freq.set_xlim(0, max(positive_frequencies))
-        #self.ax_freq.set_ylim(0,max(positive_magnitude))
-        #print(f"max(positive_magnitude):{max(positive_magnitude)}")
         self.ax_freq.set_ylim(0, 5e7)
         self.ax_freq.legend()
+        ###
+        # 計算每個時間點的瞬時能量
+        instantaneous_energy = np.square(np.abs(self.y_data))
 
+        # 計算總能量（累加所有瞬時能量）
+        total_energy = np.cumsum(instantaneous_energy)
+
+        # 繪製總能量圖
+        self.ax_energy.plot(self.x_data, total_energy, label="總能量", color='purple')
+        self.ax_energy.set_title("時域總能量圖")
+        self.ax_energy.set_xlabel("時間(秒)")
+        self.ax_energy.set_ylabel("累積能量")
+        self.ax_energy.legend()
+        # 假設您知道最大累積能量範圍，您可以手動設定範圍
+        self.ax_energy.set_ylim(0, 5e11)  # 這裡以 1e5 為例，根據您的數據調整
+
+        # 如果您想自動調整 y 軸範圍，可以設置一些條件來確定範圍
+        # 例如，設置 y 軸範圍為總能量的最大值的某個比例
+        #max_total_energy = np.max(total_energy)
+        #self.ax_energy.set_ylim(0, max_total_energy * 1.2)  # 設置最大值為最大總能量的 120%
+
+        ###
+        '''
+        # 計算能量並繪製
+        # 這裡假設能量等於振幅的平方
+        energy = np.square(np.abs(self.y_data))  # 計算能量
+
+        # 繪製能量圖
+        self.ax_energy.plot(self.x_data, energy, label="信號能量", color='purple')
+        self.ax_energy.set_title("時域能量圖")
+        self.ax_energy.set_xlabel("時間(秒)")
+        self.ax_energy.set_ylabel("能量")
+        self.ax_energy.legend()
+        '''
+        # 顯示結果
         peak_info = "前 5 大頻率與幅度:\n"
         for f, m in zip(self.top_frequencies, self.top_magnitudes):
             peak_info += f"頻率 {f:.4f} Hz，振幅 {m:.2f}\n"
-        ###
+
         self.fft_top_df = pd.DataFrame({
             'Peak_Rank': range(1, 6),
             'Frequency_Hz': self.top_frequencies,
             'Amplitude': self.top_magnitudes
         })
 
-        #
-        # 強制轉型為 int，避免顯示成浮點數
         self.fft_top_df['Peak_Rank'] = self.fft_top_df['Peak_Rank'].astype(int)
-        #
 
-        print(f"self.fft_top_df:{self.fft_top_df}")
-        self.analysis_result = ""
         # 計算最大振幅與基頻差異
-        valid_indices = [i for i, f in enumerate(self.top_frequencies) if f > 30 and f< 62 ]
-        #analysis_result = ""
+        valid_indices = [i for i, f in enumerate(self.top_frequencies) if 30 < f < 62]
 
         if valid_indices:
             base_index = valid_indices[np.argmin([self.top_frequencies[i] for i in valid_indices])]
@@ -460,43 +528,34 @@ class RealtimePlotApp(ctk.CTk):
             max_index = np.argmax(self.top_magnitudes)
             max_freq = self.top_frequencies[max_index]
             max_amp = self.top_magnitudes[max_index]
-            if abs(max_freq-base_freq)<2 or base_amp == 0:
-                percent_diff=0
-            else:   
+            if abs(max_freq - base_freq) < 2 or base_amp == 0:
+                percent_diff = 0
+            else:
                 percent_diff = ((max_amp - base_amp) / base_amp) * 100
-            # 清空 analysis_result
-            ###暫時註解掉
-            '''
-            self.analysis_result = ""
-            self.analysis_result += f"\n基頻: {base_freq:.2f} Hz，基頻振幅: {base_amp:.2f}\n"
-            self.analysis_result += f"最大振幅: {max_amp:.2f}（頻率: {max_freq:.2f} Hz）\n"
-            self.analysis_result += f"最大振幅與基頻差異: {percent_diff:.2f}%\n"
-            '''
-            ###暫時註解掉
         else:
             self.analysis_result += "找不到大於 30 Hz 且小於62 Hz 的基頻\n"
-            base_amp=1e10;
-            base_freq=-10000;
-            ##
+            base_freq = -10000
+            base_amp = 1e10
             max_index = np.argmax(self.top_magnitudes)
             max_freq = self.top_frequencies[max_index]
             max_amp = self.top_magnitudes[max_index]
             percent_diff = ((max_amp - base_amp) / base_amp) * 100
-            ##
-        #self.analysis_result = ""
-        self.analysis_result += f"基頻: {base_freq:.2f} Hz，基頻振幅: {base_amp:.2f}\n"
+
+        self.analysis_result = f"基頻: {base_freq:.2f} Hz，基頻振幅: {base_amp:.2f}\n"
         self.analysis_result += f"最大振幅: {max_amp:.2f}（頻率: {max_freq:.2f} Hz）\n"
         self.analysis_result += f"最大振幅與基頻差異: {percent_diff:.2f}%\n"
-        ##
+
         # 儲存為實體變數供其他函數使用
         self.base_freq = base_freq
         self.base_amp = base_amp
         self.max_freq = max_freq
         self.max_amp = max_amp
         self.percent_diff = percent_diff
-        # 顯示到文字框
-        self.csv_textbox.delete(1.0, ctk.END)
+        # 顯示結果到文字框
+        #self.csv_textbox.delete(1.0, ctk.END)
         self.csv_textbox.insert(ctk.END, self.analysis_result)
+        
+        # 更新畫布
         self.canvas.draw()
 
 
@@ -595,6 +654,7 @@ class RealtimePlotApp(ctk.CTk):
         self.y_data = []
         self.ax_time.clear()
         self.ax_freq.clear()
+        self.ax_energy.clear()
         self.canvas.draw()
         self.csv_textbox.delete(1.0, ctk.END)
         # 清空 analysis_result
