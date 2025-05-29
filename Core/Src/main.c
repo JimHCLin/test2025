@@ -18,11 +18,10 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include <stdbool.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdbool.h>
 
 /* USER CODE END Includes */
 
@@ -57,6 +56,7 @@ UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 ADC_HandleTypeDef hadc1;        // ADC 控制句柄
+//ADC_HandleTypeDef hadc2;
 I2C_HandleTypeDef hi2c1;        // I2C 控制句柄
 UART_HandleTypeDef huart1;      // UART1 控制句柄
 UART_HandleTypeDef huart2;      // UART2 控制句柄
@@ -272,9 +272,9 @@ void updateFSRState(void)
 }
 int getSlidingAverageFSRValue(void)
 {
-    int raw = readSingleADCValue();
-    int slidingAvg = slidingWindowAvg(raw);
-    return slidingAvg;
+    //int raw = readSingleADCValue();
+    //int slidingAvg = slidingWindowAvg(raw);
+    //return slidingAvg;
 }
 void receiveDataUart()
 {
@@ -347,7 +347,7 @@ uint16_t readSingleADCValue(int sensorIndex)
     if (sensorIndex == 1) {
         hadc = &hadc1;
     } else if (sensorIndex == 2) {
-        hadc = &hadc2;
+        //hadc = &hadc2;
     } else {
         return 0; // 無效的 index
     }
@@ -366,57 +366,27 @@ uint16_t readSingleADCValue(int sensorIndex)
 
     return adcValue;
 }
-uint16_t readSingleADCValue(int sensorIndex)
+
+uint32_t readAveragedFSR(int sensorIndex,uint32_t sensorPressDuration)
 {
-    HAL_StatusTypeDef status;
-    uint16_t adcValue = 0;
-
-    // 啟動 ADC
-    if(sensorIndex==1)
-    {
-    	status = HAL_ADC_Start(&hadc1);
-    }
-    else if(sensorIndex==2)
-    {
-    	status = HAL_ADC_Start(&hadc2);
-    }
-    if (status != HAL_OK) {
-        // 啟動失敗，回傳錯誤值
-        return 0;
-    }
-
-    // 輪詢等待 ADC 轉換完成（最多等待10ms）
-    status = HAL_ADC_PollForConversion(&hadc1, 10);
-    if (status == HAL_OK)
-    {
-    	adcValue = HAL_ADC_GetValue(&hadc1);
-        // 輪詢超時或失敗，回傳錯誤值
-
-    }
-    else
-    {
-    	adcValue= 0;
-    }
-
-    // 取得轉換結果
-    return adcValue;
-}
-
-uint32_t readAveragedFSR(int sensorIndex,uint32_t samples)
-{
+	//sensorPressDuration=30;
 	uint32_t sum = 0;
 	uint32_t average = 0;
-    if (samples == 0)
+	uint32_t count = 0;
+	count=sensorPressDuration/10;
+    if (sensorPressDuration == 0)
     {
     	return 0;
     }
-    for (uint32_t i = 0; i < samples; i++)
+    for (uint32_t i = 0; i < count; i++)
     {
+    	//count=3
+    	//i=0, 1 2
         uint16_t valueADC = readSingleADCValue(sensorIndex); // 假設ADC為16-bit
         sum += valueADC;
-        HAL_Delay(1);
+        HAL_Delay(10);
     }
-    average=sum / samples;
+    average=sum / count;
 
     return average;
 }
@@ -437,8 +407,8 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 
 	if (isSensor1Enabled && isSensor2Enabled)
 	{
-		forceSensor1AveragedaValue=readAveragedFSR(1,3);
-		forceSensor2AveragedaValue=readAveragedFSR(1,3);//再改成2
+		forceSensor1AveragedaValue=readAveragedFSR(1,sensorPressDuration);
+		forceSensor2AveragedaValue=readAveragedFSR(1,sensorPressDuration);//再改成2
 		if(forceSensor1AveragedaValue || forceSensor2AveragedaValue> pressureValueThreshold)
 		{
 			allForceSensorStateResult=true;
@@ -474,7 +444,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-  char buffer[40]="";
+  //char buffer[40]="";
   int arr[10] = {0};  // 全部初始化為 0
   int a=sizeof(arr);  // ✅ 這裡是陣列大小  a=40   10*4
   int value=2;
@@ -527,10 +497,10 @@ int main(void)
 	  //
 	  bool touchSwitchFinalState=false;
 	  bool forceSensorFinalState=false;
-	  uint32_t sensorPressDuration = 0;
+	  uint32_t sensorPressDuration = 100;
 	  uint32_t pressValueThreshold = 3000; //
-	  bool isSensor1Enabled=false;
-	  bool isSensor2Enabled=false;
+	  bool isSensor1Enabled=true;
+	  bool isSensor2Enabled=true;
 
 
 	  //uint32_t sensor1Flag=0;
@@ -848,7 +818,7 @@ static void MX_UART4_Init(void)
 
   /* USER CODE END UART4_Init 1 */
   huart4.Instance = UART4;
-  huart4.Init.BaudRate = 9600;
+  huart4.Init.BaudRate = 115200;
   huart4.Init.WordLength = UART_WORDLENGTH_8B;
   huart4.Init.StopBits = UART_STOPBITS_1;
   huart4.Init.Parity = UART_PARITY_NONE;
@@ -883,7 +853,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 9600;
+  huart1.Init.BaudRate = 115200;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -918,7 +888,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 9600;
+  huart2.Init.BaudRate = 115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -953,7 +923,7 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 9600;//115200
+  huart3.Init.BaudRate = 115200;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
