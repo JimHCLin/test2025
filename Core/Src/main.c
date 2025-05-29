@@ -76,6 +76,34 @@ typedef enum {
 } FSR_State;
 FSR_State fsrState = FSR_RELEASED;
 
+
+typedef enum {
+    ADC_READ_INIT,
+    ADC_READING,
+    ADC_READ_DONE
+} ADCReadState_t;
+
+typedef struct {
+    ADCReadState_t state;
+    uint32_t startTime;
+    uint32_t sum;
+    uint32_t count;
+    uint32_t maxCount;
+    int sensorIndex;
+    uint32_t average;
+} ADCReadContext_t;
+
+//
+ADCReadContext_t fsr1Context = {0};
+ADCReadContext_t fsr2Context = {0};
+bool fsr1Done = false;
+bool fsr2Done = false;
+uint32_t fsr1Value = 0;
+uint32_t fsr2Value = 0;
+
+//
+
+
 //int fsrValueGlobal=0;
 /* USER CODE END PV */
 
@@ -341,6 +369,21 @@ int slidingWindowAvg(int new_sample) {
     return sum / count;
 }
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  /* Prevent unused argument(s) compilation warning */
+	if(GPIO_Pin == GPIO_PIN_13){
+		ledTrigger = 1;
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+		//HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_8);  // 切換燈狀態
+	    //HAL_Delay(200);
+	    //將 PB8 Off
+	    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+		//x = (x == 0)? 1:0;
+	}
+}
+
+//
 uint16_t readSingleADCValue(int sensorIndex)
 {
     HAL_StatusTypeDef status;
@@ -372,9 +415,81 @@ uint16_t readSingleADCValue(int sensorIndex)
     return adcValue;
 }
 
+
+
+void startADCRead(ADCReadContext_t *context, int sensorIndex, uint32_t sensorPressDuration)
+{
+    (*context).sensorIndex = sensorIndex;
+    (*context).maxCount = sensorPressDuration / 10;
+    if ((*context).maxCount == 0) (*context).maxCount = 1; // 防除以0
+    (*context).sum = 0;
+    (*context).count = 0;
+    (*context).state = ADC_READ_INIT;
+}
+
+bool processADCRead(ADCReadContext_t *context)
+{
+    switch ((*context).state)
+    {
+        case ADC_READ_INIT:
+            (*context).startTime = HAL_GetTick();
+            (*context).state = ADC_READING;
+            break;
+
+        case ADC_READING:
+            if (HAL_GetTick() - (*context).startTime >= 10)  // 間隔10ms讀一次
+            {
+                uint16_t valueADC = readSingleADCValue((*context).sensorIndex);
+                (*context).sum += valueADC;
+                (*context).count++;
+                (*context).startTime = HAL_GetTick(); // 重設計時
+                if ((*context).count >= (*context).maxCount)
+                {
+                    (*context).average = (*context).sum / (*context).count;
+                    (*context).state = ADC_READ_DONE;
+                }
+            }
+            break;
+
+        case ADC_READ_DONE:
+            return true;  // 完成讀取了
+
+        default:
+            break;
+    }
+    return false;  // 尚未完成
+}
+
+uint32_t getADCReadAverage(ADCReadContext_t *context)
+{
+    return (*context).average;
+}
+
+
+
+
+
+//
+
 uint32_t readAveragedFSR(int sensorIndex,uint32_t sensorPressDuration)
 {
+	//非阻塞
+
+	 ADCReadContext_t adcContext = {0};
+
+	startADCRead(&adcContext, sensorIndex, sensorPressDuration);
+
+	while (!processADCRead(&adcContext))
+	{
+		// 可在這裡執行其他任務，非阻塞
+	}
+
+	return getADCReadAverage(&adcContext);
+
+    /*
+	//阻塞
 	//sensorPressDuration=30;
+
 	uint32_t sum = 0;
 	uint32_t average = 0;
 	uint32_t count = 0;
@@ -393,22 +508,17 @@ uint32_t readAveragedFSR(int sensorIndex,uint32_t sensorPressDuration)
     }
     average=sum / count;
 
-    return average;
+
+    //return average;
+     */
+
 }
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-  /* Prevent unused argument(s) compilation warning */
-	if(GPIO_Pin == GPIO_PIN_13){
-		ledTrigger = 1;
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
-		//HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_8);  // 切換燈狀態
-	    //HAL_Delay(200);
-	    //將 PB8 Off
-	    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
-		//x = (x == 0)? 1:0;
-	}
-}
+
+////////
+
+
+
 bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32_t sensorPressDuration,uint32_t pressureValueThreshold)
 {
 	bool allForceSensorStateResult=false;
@@ -418,7 +528,7 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 
 	if (isSensor1Enabled && isSensor2Enabled)
 	{
-		forceSensor1AveragedaValue=readAveragedFSR(1,sensorPressDuration);
+		forceSensor1AveragedaValue=readAveragedFSR(1,sensorPressDuration);//非阻塞依序讀
 		forceSensor2AveragedaValue=readAveragedFSR(2,sensorPressDuration);//再改成2
 		//forceSensor1AveragedaValue=0;
 		//forceSensor2AveragedaValue=0;
@@ -451,6 +561,112 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 		allForceSensorStateResult=false;
 	}
 	return allForceSensorStateResult;
+}
+
+
+
+
+
+
+
+
+
+////////////////////
+
+bool checkSwitchState(int sensorIndex,uint32_t switchDebounceDuration)
+{
+	bool isTouchSwitchPressed=false;
+	uint32_t static lastDebounceTime = 0;//它只會在程式執行到該行定義時 初始化一次（第一次呼叫函數時）。
+    //之後每次呼叫 checkSwitchState() 時，這個變數都會保留上一次的值，不會再被重設為 0
+    static GPIO_PinState lastButtonState = GPIO_PIN_SET;//沒按下 PC8 透過電阻拉到 3.3V（邏輯高
+	GPIO_PinState currentState = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_8);//低電位
+	if (currentState != lastButtonState)
+	{
+		lastDebounceTime = HAL_GetTick();  // 有變化就重設時間
+	}
+	uint32_t elapsed = HAL_GetTick() - lastDebounceTime;  // 算出經過了多少毫秒
+	if (elapsed > switchDebounceDuration)
+	{
+		if (currentState == GPIO_PIN_RESET)
+		{
+			// 按鈕已穩定按下，可以執行動作
+			isTouchSwitchPressed=true;
+
+		}
+	}
+
+	lastButtonState = currentState;
+}
+bool getAllTouchSwitchState(bool isSwitch1Enabled,bool isSwitch2Enabled,bool isSwitch3Enabled,bool isSwitch4Enabled,uint32_t touchSwitchDebounceDuration)
+{
+	bool allTouchSwitchStateResult=false;
+	//bool isTouchSwitch1Pressed = true;  // 開關1被按下
+	bool isTouchSwitch1Pressed = false; // 開關1沒被按下
+	bool isTouchSwitch2Pressed = false;
+	bool isTouchSwitch3Pressed = false;
+	bool isTouchSwitch4Pressed = false;
+	uint32_t forceSensor2AveragedaValue=0;
+	int disabledCount = 0;
+	if (!isSwitch1Enabled) disabledCount++;
+	if (!isSwitch2Enabled) disabledCount++;
+	if (!isSwitch3Enabled) disabledCount++;
+	if (!isSwitch4Enabled) disabledCount++;
+
+	if (disabledCount == 0)
+	{   //四個開關都啟用
+		isTouchSwitch1Pressed=checkSwitchState(1,touchSwitchDebounceDuration);
+		isTouchSwitch2Pressed=checkSwitchState(2,touchSwitchDebounceDuration);//再改成2
+
+		int pressedCount = isTouchSwitch1Pressed + isTouchSwitch2Pressed + isTouchSwitch3Pressed + isTouchSwitch4Pressed;
+		if (pressedCount >= 2) {
+		    // 執行事情
+		}
+		else
+		{
+		    // 開關1沒被按下要做的事
+		}
+		//forceSensor1AveragedaValue=0;
+		//forceSensor2AveragedaValue=0;
+		//if(forceSensor1AveragedaValue > pressureValueThreshold ||forceSensor2AveragedaValue > pressureValueThreshold)
+		//{
+			//allForceSensorStateResult=true;
+		//}
+		 //return true; // 兩個sensor都沒啟用，回傳 false
+
+	}
+	else if (disabledCount == 1)
+	{
+		printf("一個 switch 不啟用\n");
+		printf("啟用的 switch 有：");
+		if (isSwitch1Enabled) printf("Switch1 ");
+
+	}
+	else if (disabledCount == 2)
+	{
+		printf("兩個 switch 不啟用\n");
+		printf("啟用的 switch 有：");
+		if (isSwitch1Enabled) printf("Switch1 ");
+		if (isSwitch2Enabled) printf("Switch2 ");
+		if (isSwitch3Enabled) printf("Switch3 ");
+		if (isSwitch4Enabled) printf("Switch4 ");
+
+	}
+	else if (disabledCount == 3) {
+		printf("三個 switch 不啟用\n");
+		printf("啟用的 switch 有：");
+		if (isSwitch1Enabled) printf("Switch1 ");
+		if (isSwitch2Enabled) printf("Switch2 ");
+		if (isSwitch3Enabled) printf("Switch3 ");
+		if (isSwitch4Enabled) printf("Switch4 ");
+
+	}
+	else if (disabledCount == 4) {
+		printf("全部 switch 都不啟用\n");
+	}
+	else {
+		printf("狀況不明\n");
+	}
+	return allTouchSwitchStateResult;
 }
 
 
