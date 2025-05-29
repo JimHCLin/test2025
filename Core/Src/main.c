@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include <stdbool.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -335,35 +336,130 @@ int slidingWindowAvg(int new_sample) {
 
     return sum / count;
 }
-// 單次讀取 ADC 值
-int readSingleADCValue(void)
+
+uint16_t readSingleADCValue(int sensorIndex)
 {
-    HAL_ADC_Start(&hadc1);
-    if (HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK)
-    {
-        return HAL_ADC_GetValue(&hadc1);
+    HAL_StatusTypeDef status;
+    uint16_t adcValue = 0;
+    ADC_HandleTypeDef* hadc = NULL;
+
+    // 根據 sensorIndex 選擇對應 ADC
+    if (sensorIndex == 1) {
+        hadc = &hadc1;
+    } else if (sensorIndex == 2) {
+        hadc = &hadc2;
+    } else {
+        return 0; // 無效的 index
     }
-    return 0; // 失敗回傳 0
+
+    // 啟動 ADC
+    status = HAL_ADC_Start(hadc);
+    if (status != HAL_OK) {
+        return 0; // 啟動失敗
+    }
+
+    // 輪詢等待轉換完成
+    status = HAL_ADC_PollForConversion(hadc, 10);
+    if (status == HAL_OK) {
+        adcValue = HAL_ADC_GetValue(hadc);
+    }
+
+    return adcValue;
+}
+uint16_t readSingleADCValue(int sensorIndex)
+{
+    HAL_StatusTypeDef status;
+    uint16_t adcValue = 0;
+
+    // 啟動 ADC
+    if(sensorIndex==1)
+    {
+    	status = HAL_ADC_Start(&hadc1);
+    }
+    else if(sensorIndex==2)
+    {
+    	status = HAL_ADC_Start(&hadc2);
+    }
+    if (status != HAL_OK) {
+        // 啟動失敗，回傳錯誤值
+        return 0;
+    }
+
+    // 輪詢等待 ADC 轉換完成（最多等待10ms）
+    status = HAL_ADC_PollForConversion(&hadc1, 10);
+    if (status == HAL_OK)
+    {
+    	adcValue = HAL_ADC_GetValue(&hadc1);
+        // 輪詢超時或失敗，回傳錯誤值
+
+    }
+    else
+    {
+    	adcValue= 0;
+    }
+
+    // 取得轉換結果
+    return adcValue;
 }
 
-// 多次取樣後平均讀取 FSR 值
-int readAveragedFSR(int samples)
+uint32_t readAveragedFSR(int sensorIndex,uint32_t samples)
 {
-    int sum = 0;
-    for (int i = 0; i < samples; i++)
+	uint32_t sum = 0;
+	uint32_t average = 0;
+    if (samples == 0)
     {
-    	int valueADC=readSingleADCValue();
-        sum += valueADC;
-        HAL_Delay(1); // 適當延遲，避免過快取樣
+    	return 0;
     }
-    return sum / samples;
+    for (uint32_t i = 0; i < samples; i++)
+    {
+        uint16_t valueADC = readSingleADCValue(sensorIndex); // 假設ADC為16-bit
+        sum += valueADC;
+        HAL_Delay(1);
+    }
+    average=sum / samples;
+
+    return average;
 }
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   /* Prevent unused argument(s) compilation warning */
 	if(GPIO_Pin == GPIO_PIN_13){
 		x = (x == 0)? 1:0;
 	}
+}
+bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32_t sensorPressDuration,uint32_t pressureValueThreshold)
+{
+	bool allForceSensorStateResult=false;
+	uint32_t forceSensor1AveragedaValue=0;
+	uint32_t forceSensor2AveragedaValue=0;
+
+
+	if (isSensor1Enabled && isSensor2Enabled)
+	{
+		forceSensor1AveragedaValue=readAveragedFSR(1,3);
+		forceSensor2AveragedaValue=readAveragedFSR(1,3);//再改成2
+		if(forceSensor1AveragedaValue || forceSensor2AveragedaValue> pressureValueThreshold)
+		{
+			allForceSensorStateResult=true;
+		}
+	     //return true; // 兩個sensor都沒啟用，回傳 false
+	}
+	else if(isSensor1Enabled)
+	{
+		allForceSensorStateResult=true;
+
+
+	}
+	else if(isSensor2Enabled)
+	{
+		allForceSensorStateResult=true;
+	}
+	else
+	{
+		allForceSensorStateResult=false;
+	}
+	return allForceSensorStateResult;
 }
 
 
@@ -428,6 +524,23 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  //
+	  bool touchSwitchFinalState=false;
+	  bool forceSensorFinalState=false;
+	  uint32_t sensorPressDuration = 0;
+	  uint32_t pressValueThreshold = 3000; //
+	  bool isSensor1Enabled=false;
+	  bool isSensor2Enabled=false;
+
+
+	  //uint32_t sensor1Flag=0;
+	  //uint32_t sensor2Flag=0;
+
+
+	  //getAllTouchSwitchState();
+	  forceSensorFinalState=getAllForceSensorState(isSensor1Enabled,isSensor2Enabled,sensorPressDuration,pressValueThreshold);
+
+
 	  ///
 	  ///
 	  //snprintf(buffer, sizeof(buffer), "%d", value);
@@ -522,8 +635,8 @@ int main(void)
 	  }
 */
 	  // 啟用力量感測器功能
-	  updateFSRState();   // 呼叫防彈跳判斷
-	  HAL_Delay(1000);     // 簡短延遲避免過度讀取ADC
+	  //updateFSRState();   // 呼叫防彈跳判斷
+	  HAL_Delay(100);     // 簡短延遲避免過度讀取ADC
 	  //
 	  //printf("Tick\r\n");
     /* USER CODE END WHILE */
