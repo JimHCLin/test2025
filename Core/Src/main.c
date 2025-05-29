@@ -96,10 +96,7 @@ typedef struct {
 //
 ADCReadContext_t fsr1Context = {0};
 ADCReadContext_t fsr2Context = {0};
-bool fsr1Done = false;
-bool fsr2Done = false;
-uint32_t fsr1Value = 0;
-uint32_t fsr2Value = 0;
+
 
 //
 
@@ -466,9 +463,6 @@ uint32_t getADCReadAverage(ADCReadContext_t *context)
 }
 
 
-
-
-
 //
 
 uint32_t readAveragedFSR(int sensorIndex,uint32_t sensorPressDuration)
@@ -521,21 +515,111 @@ uint32_t readAveragedFSR(int sensorIndex,uint32_t sensorPressDuration)
 
 bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32_t sensorPressDuration,uint32_t pressureValueThreshold)
 {
+
+	/////////// 這個函式只執行一次,他會用阻塞式的方式等兩個sensor 都做完後 才會跳出去
+	// 但是這兩個sensor在讀資料時,是用非阻塞的方式
+	//所以每個 sensor 要讀100ms ,但這個函式執行完橫,整體時間只有100ms
+	bool allForceSensorStateResult = false;
+	uint32_t forceSensor1AveragedValue = 0;
+	uint32_t forceSensor2AveragedValue = 0;
+	bool fsr1Done = false;
+	bool fsr2Done = false;
+	uint32_t startTime = HAL_GetTick();
+	// 啟動需要的感測器
+	if (isSensor1Enabled) {
+		startADCRead(&fsr1Context, 1, sensorPressDuration);
+		fsr1Done = false;
+	} else {
+		fsr1Done = true;  // 不啟用就視為已完成
+	}
+
+	if (isSensor2Enabled) {
+		startADCRead(&fsr2Context, 2, sensorPressDuration);
+		fsr2Done = false;
+	} else {
+		fsr2Done = true;  // 不啟用就視為已完成
+	}
+
+	// 非阻塞等待兩個感測器都完成
+	while (!fsr1Done || !fsr2Done)
+	{
+		if (!fsr1Done && processADCRead(&fsr1Context)) {
+			forceSensor1AveragedValue = getADCReadAverage(&fsr1Context);
+			fsr1Done = true;
+		}
+
+		if (!fsr2Done && processADCRead(&fsr2Context)) {
+			forceSensor2AveragedValue = getADCReadAverage(&fsr2Context);
+			fsr2Done = true;
+		}
+
+		// ✅ 可插入其他非阻塞任務
+	}
+
+	// 比較是否有達到閾值
+	if ((isSensor1Enabled && forceSensor1AveragedValue > pressureValueThreshold) ||
+		(isSensor2Enabled && forceSensor2AveragedValue > pressureValueThreshold)) {
+		allForceSensorStateResult = true;
+	}
+
+	return allForceSensorStateResult;
+
+
+
+	//////////
+	/*
 	bool allForceSensorStateResult=false;
 	uint32_t forceSensor1AveragedaValue=0;
 	uint32_t forceSensor2AveragedaValue=0;
-
+	bool fsr1Done = false;
+	bool fsr2Done = false;
+	uint32_t fsr1Value = 0;
+	uint32_t fsr2Value = 0;
 
 	if (isSensor1Enabled && isSensor2Enabled)
 	{
-		forceSensor1AveragedaValue=readAveragedFSR(1,sensorPressDuration);//非阻塞依序讀
-		forceSensor2AveragedaValue=readAveragedFSR(2,sensorPressDuration);//再改成2
-		//forceSensor1AveragedaValue=0;
-		//forceSensor2AveragedaValue=0;
-		if(forceSensor1AveragedaValue > pressureValueThreshold ||forceSensor2AveragedaValue > pressureValueThreshold)
+		//非阻塞
+		startADCRead(&fsr1Context, 1, sensorPressDuration);
+		startADCRead(&fsr2Context, 2, sensorPressDuration);
+		fsr1Done = false;
+		fsr2Done = false;
+		while (1)
 		{
-			allForceSensorStateResult=true;
+				// 可在這裡執行其他任務，非阻塞
+
+
+			if (!fsr1Done && processADCRead(&fsr1Context)) {
+				forceSensor1AveragedaValue = getADCReadAverage(&fsr1Context);
+				fsr1Done = true;
+				//printf("FSR1 average = %lu\n", fsr1Value);
+			}
+
+			if (!fsr2Done && processADCRead(&fsr2Context)) {
+				forceSensor2AveragedaValue = getADCReadAverage(&fsr2Context);
+				fsr2Done = true;
+				printf("FSR2 average = %lu\n", fsr2Value);
+			}
+
+			// 當兩個都完成後處理資料
+			if (fsr1Done && fsr2Done)
+			{
+				if(forceSensor1AveragedaValue > pressureValueThreshold ||forceSensor2AveragedaValue > pressureValueThreshold)
+				{
+					allForceSensorStateResult=true;
+				}
+				break;
+				//printf("FSR1 = %lu, FSR2 = %lu\n", fsr1Value, fsr2Value);
+			}
 		}
+
+
+		/////////////////////
+		//forceSensor1AveragedaValue=readAveragedFSR(1,sensorPressDuration);//讀完forceSensor1AveragedaValue才會往下走
+		//forceSensor2AveragedaValue=readAveragedFSR(2,sensorPressDuration);//
+		//if(forceSensor1AveragedaValue > pressureValueThreshold ||forceSensor2AveragedaValue > pressureValueThreshold)
+		//{
+			//allForceSensorStateResult=true;
+		//}
 	     //return true; // 兩個sensor都沒啟用，回傳 false
 	}
 	else if(isSensor1Enabled)
@@ -561,6 +645,7 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 		allForceSensorStateResult=false;
 	}
 	return allForceSensorStateResult;
+	*/
 }
 
 
@@ -758,7 +843,17 @@ int main(void)
 	  bool touchSwitchFinalState = false;
 
 	  //
+	  uint32_t startTime = HAL_GetTick();
 	  forceSensorFinalState=getAllForceSensorState(isforceSensor1Enabled,isforceSensor2Enabled,forceSensorPressDuration,forcepPressValueThreshold);
+
+
+	  uint32_t endTime = HAL_GetTick();
+	  uint32_t duration = endTime - startTime;
+
+
+
+
+
 
 	  touchSwitchFinalState = getAllTouchSwitchState(
 	      isTouchSwitch1Enabled,
