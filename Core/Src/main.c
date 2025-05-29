@@ -46,6 +46,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+ADC_HandleTypeDef hadc2;
 
 I2C_HandleTypeDef hi2c1;
 
@@ -67,6 +68,7 @@ int buffer[WINDOW_SIZE] = {0};
 int index = 0;
 int count = 0;
 int x=0;
+uint8_t ledTrigger = 0;
 uint32_t lastDebounceTime = 0;
 typedef enum {
     FSR_RELEASED = 0,
@@ -79,6 +81,7 @@ FSR_State fsrState = FSR_RELEASED;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void PeriphCommonClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_I2C1_Init(void);
@@ -86,6 +89,7 @@ static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_UART4_Init(void);
+static void MX_ADC2_Init(void);
 /* USER CODE BEGIN PFP */
 void SystemClock_Config(void);
 //void transmit_data_uart(char* bufferPtr);
@@ -108,7 +112,7 @@ void lightOnLED(void)
 {
 	//int count=0;
 	//int statusLED=0;
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+	//HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
     //state = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_8);
     //HAL_Delay(100);
 }
@@ -118,7 +122,7 @@ void lightOffLED(void)
 	//int statusLED=0;
 
     //將 PB8 Off
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+    //HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
     //state = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_8);
     //receive_data_uart();
     //HAL_Delay(100);
@@ -347,8 +351,9 @@ uint16_t readSingleADCValue(int sensorIndex)
     if (sensorIndex == 1) {
         hadc = &hadc1;
     } else if (sensorIndex == 2) {
-        //hadc = &hadc2;
+        hadc = &hadc2;
     } else {
+    	Error_Handler();  // 加入錯誤處理
         return 0; // 無效的 index
     }
 
@@ -395,7 +400,13 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   /* Prevent unused argument(s) compilation warning */
 	if(GPIO_Pin == GPIO_PIN_13){
-		x = (x == 0)? 1:0;
+		ledTrigger = 1;
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+		//HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_8);  // 切換燈狀態
+	    //HAL_Delay(200);
+	    //將 PB8 Off
+	    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+		//x = (x == 0)? 1:0;
 	}
 }
 bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32_t sensorPressDuration,uint32_t pressureValueThreshold)
@@ -408,8 +419,10 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 	if (isSensor1Enabled && isSensor2Enabled)
 	{
 		forceSensor1AveragedaValue=readAveragedFSR(1,sensorPressDuration);
-		forceSensor2AveragedaValue=readAveragedFSR(1,sensorPressDuration);//再改成2
-		if(forceSensor1AveragedaValue || forceSensor2AveragedaValue> pressureValueThreshold)
+		forceSensor2AveragedaValue=readAveragedFSR(2,sensorPressDuration);//再改成2
+		//forceSensor1AveragedaValue=0;
+		//forceSensor2AveragedaValue=0;
+		if(forceSensor1AveragedaValue > pressureValueThreshold ||forceSensor2AveragedaValue > pressureValueThreshold)
 		{
 			allForceSensorStateResult=true;
 		}
@@ -417,13 +430,21 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 	}
 	else if(isSensor1Enabled)
 	{
-		allForceSensorStateResult=true;
-
+		forceSensor1AveragedaValue=readAveragedFSR(1,sensorPressDuration);
+		if(forceSensor1AveragedaValue > pressureValueThreshold)
+		{
+			allForceSensorStateResult=true;
+		}
 
 	}
 	else if(isSensor2Enabled)
 	{
-		allForceSensorStateResult=true;
+		forceSensor2AveragedaValue=readAveragedFSR(2,sensorPressDuration);//再改成2
+				if(forceSensor2AveragedaValue > pressureValueThreshold)
+				{
+					allForceSensorStateResult=true;
+				}
+
 	}
 	else
 	{
@@ -465,6 +486,9 @@ int main(void)
   /* Configure the system clock */
   SystemClock_Config();
 
+  /* Configure the peripherals common clocks */
+  PeriphCommonClock_Config();
+
   /* USER CODE BEGIN SysInit */
 
   /* USER CODE END SysInit */
@@ -477,6 +501,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   MX_UART4_Init();
+  MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
 
 
@@ -494,21 +519,60 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  //
-	  bool touchSwitchFinalState=false;
+	  // 全部力量感測器回傳值
 	  bool forceSensorFinalState=false;
-	  uint32_t sensorPressDuration = 100;
-	  uint32_t pressValueThreshold = 3000; //
-	  bool isSensor1Enabled=true;
-	  bool isSensor2Enabled=true;
+	  //從flash讀取力量感測器初始參數
+	  uint32_t forceSensorPressDuration = 100;
+	  uint32_t forcepPressValueThreshold = 3000; //
+	  bool isforceSensor1Enabled=true;
+	  bool isforceSensor2Enabled=true;
+	  //
 
+	  // Touch switch enabled flags
+	  bool isTouchSwitch1Enabled = true;
+	  bool isTouchSwitch2Enabled = true;
+	  bool isTouchSwitch3Enabled = true;
+	  bool isTouchSwitch4Enabled = true;
 
+	  // Touch switch behavior parameters
+	  uint32_t touchSwitchDebounceDuration = 100;
+	  uint32_t touchSwitchPressThreshold = 3000;
+
+	  // Final result of all switches
+	  bool touchSwitchFinalState = false;
+
+	  //
+	  forceSensorFinalState=getAllForceSensorState(isforceSensor1Enabled,isforceSensor2Enabled,forceSensorPressDuration,forcepPressValueThreshold);
+
+	  touchSwitchFinalState = getAllTouchSwitchState(
+	      isTouchSwitch1Enabled,
+	      isTouchSwitch2Enabled,
+	      isTouchSwitch3Enabled,
+	      isTouchSwitch4Enabled,
+	      touchSwitchDebounceDuration);
+	  //
+
+	  /*
+	  if (ledTrigger) {
+	          HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+	          HAL_Delay(5000);
+	          HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+	          ledTrigger = 0;
+	      }
+	      */
+	  //
+
+	  //HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+
+	  //HAL_Delay(200);
+	  //將 PB8 Off
+	  //HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
 	  //uint32_t sensor1Flag=0;
 	  //uint32_t sensor2Flag=0;
 
 
 	  //getAllTouchSwitchState();
-	  forceSensorFinalState=getAllForceSensorState(isSensor1Enabled,isSensor2Enabled,sensorPressDuration,pressValueThreshold);
+
 
 
 	  ///
@@ -580,12 +644,12 @@ int main(void)
 	  if (status != HAL_OK) {
 		  //將 PB8 On起來
 		  	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
-		  	  state = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_8);
+		  	  state = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_8);  //平常開關 沒按下 PC8 透過電阻拉到 3.3V（邏輯高，GPIO_PIN_SET
 		  	  i--;
 		  	  //transmit_data_uart();
 		  	  HAL_Delay(200);
 		  	  //將 PB8 Off
-		  	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+		  	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);//開關 按下時： PC8 直接接地 → 邏輯低 (GPIO_PIN_RESET)
 		  	  state = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_8);
 		  	  //receive_data_uart();
 		  	  HAL_Delay(200);
@@ -688,6 +752,31 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief Peripherals Common Clock Configuration
+  * @retval None
+  */
+void PeriphCommonClock_Config(void)
+{
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+
+  /** Initializes the peripherals clock
+  */
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+  PeriphClkInit.AdcClockSelection = RCC_ADCCLKSOURCE_PLLSAI1;
+  PeriphClkInit.PLLSAI1.PLLSAI1Source = RCC_PLLSOURCE_HSI;
+  PeriphClkInit.PLLSAI1.PLLSAI1M = 1;
+  PeriphClkInit.PLLSAI1.PLLSAI1N = 8;
+  PeriphClkInit.PLLSAI1.PLLSAI1P = RCC_PLLP_DIV7;
+  PeriphClkInit.PLLSAI1.PLLSAI1Q = RCC_PLLQ_DIV2;
+  PeriphClkInit.PLLSAI1.PLLSAI1R = RCC_PLLR_DIV2;
+  PeriphClkInit.PLLSAI1.PLLSAI1ClockOut = RCC_PLLSAI1_ADC1CLK;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
   * @brief ADC1 Initialization Function
   * @param None
   * @retval None
@@ -751,6 +840,64 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief ADC2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC2_Init(void)
+{
+
+  /* USER CODE BEGIN ADC2_Init 0 */
+
+  /* USER CODE END ADC2_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC2_Init 1 */
+
+  /* USER CODE END ADC2_Init 1 */
+
+  /** Common config
+  */
+  hadc2.Instance = ADC2;
+  hadc2.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+  hadc2.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc2.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc2.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc2.Init.LowPowerAutoWait = DISABLE;
+  hadc2.Init.ContinuousConvMode = DISABLE;
+  hadc2.Init.NbrOfConversion = 1;
+  hadc2.Init.DiscontinuousConvMode = DISABLE;
+  hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc2.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc2.Init.DMAContinuousRequests = DISABLE;
+  hadc2.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc2.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC2_Init 2 */
+
+  /* USER CODE END ADC2_Init 2 */
 
 }
 
