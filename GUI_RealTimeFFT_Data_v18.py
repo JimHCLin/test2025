@@ -537,7 +537,7 @@ class RealtimePlotApp(ctk.CTk):
                 return f"({i}x)"
         return ""
     '''
-    def classify_frequency(self, freq, base_freq=27, max_harmonic=20, tolerance=2):
+    def classify_frequency(self, freq, base_freq=27.23, max_harmonic=100, tolerance=2):
         for i in range(1, max_harmonic + 1):
             if abs(freq - base_freq * i) < tolerance:
                 return f"({i}x)"
