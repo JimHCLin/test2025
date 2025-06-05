@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdbool.h>
+#include <ForceSwitchSensor.h>  // 引用標頭檔
 
 /* USER CODE END Includes */
 
@@ -62,43 +63,18 @@ I2C_HandleTypeDef hi2c1;        // I2C 控制句柄
 UART_HandleTypeDef huart1;      // UART1 控制句柄
 UART_HandleTypeDef huart2;      // UART2 控制句柄
 UART_HandleTypeDef huart3;
-int i = 0;
-int state=0;
-int buffer[WINDOW_SIZE] = {0};
-int index = 0;
-int count = 0;
-int x=0;
+//////////////////
+
 uint8_t ledTrigger = 0;
 uint32_t lastDebounceTime = 0;
-typedef enum {
-    FSR_RELEASED = 0,
-	FSR_PRESSED = 1
-} FSR_State;
-FSR_State fsrState = FSR_RELEASED;
-
-
-typedef enum {
-    ADC_READ_INIT,
-    ADC_READING,
-    ADC_READ_DONE
-} ADCReadState_t;
-
-typedef struct {
-    ADCReadState_t state;
-    uint32_t startTime;
-    uint32_t sum;
-    uint32_t count;
-    uint32_t maxCount;
-    int sensorIndex;
-    uint32_t average;
-} ADCReadContext_t;
-
-//
-ADCReadContext_t fsr1Context = {0};
-ADCReadContext_t fsr2Context = {0};
 
 
 //
+//ADCReadContext_t fsr1Context = {0};
+//ADCReadContext_t fsr2Context = {0};
+
+
+////////////////////////////////////
 
 
 //int fsrValueGlobal=0;
@@ -133,26 +109,7 @@ void SystemClock_Config(void);
 void example(int arr[]) {
     int ww=sizeof(arr);  // ❌ 這裡不是陣列大小 w=4
 }
-void lightOnLED(void)
-{
-	//int count=0;
-	//int statusLED=0;
-	//HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
-    //state = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_8);
-    //HAL_Delay(100);
-}
-void lightOffLED(void)
-{
-	//int count=0;
-	//int statusLED=0;
 
-    //將 PB8 Off
-    //HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
-    //state = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_8);
-    //receive_data_uart();
-    //HAL_Delay(100);
-    //i++;
-}
 //讀取多次平均 + 無阻塞延遲
 /*
 int readAnalogFSR(void)
@@ -170,135 +127,8 @@ int readAnalogFSR(void)
     }
     return sum / samples;
 }*/
-void updateFSRState(void)
-{
-	//char buffer[40]={0};
-	char buffer[40] = "234";
-	char rxData[10]={0};
-	int value=100;
-	HAL_StatusTypeDef statusReceive;
-	HAL_StatusTypeDef status;
-	//int sampleAvgValue = readAveragedFSR(3);  //在同一時間點連續讀多次 ADC，算出平均（多次取樣的平均）,連續讀取 N 次 ADC，算算數平均
-	char ch;
 
-	// 讀取經過滑動平均的 FSR 值
-	//int slidingAvgValue = getSlidingAverageFSRValue(); //隨著時間對連續多次讀取的值做滑動視窗平均，有記憶之前的 N 筆數據，平滑資料變化
-    //int value = readAnalogFSR();
 
-	//value=sampleAvgValue;
-	//value=slidingAvgValue;
-
-    uint32_t currentTime = HAL_GetTick();
-
-   // if (fsrState == FSR_RELEASED)
-    //{
-        if (value > FSR_THRESHOLD_PRESS)
-        {
-            if ((currentTime - lastDebounceTime) > DEBOUNCE_DELAY_MS)
-            {
-            	fsrState = FSR_PRESSED;
-                lastDebounceTime = currentTime;
-                //lightOnLED();
-                //value=954;
-                //snprintf(buffer, sizeof(buffer), "%d", value);
-
-                //transmitDataUart(buffer);
-                //HAL_Delay(1000);
-                // 接收剛剛送出的 3 個字元
-                //HAL_UART_Receive(&huart1, (uint8_t*)rx, 3, 1000);
-                //statusReceive = HAL_UART_Receive(&huart3, (uint8_t*)rxData, 2, 10000);
-                //////////////////
-                //char rxData[3] = {0}; // 多一個位元放 \0 做字串結尾
-                //HAL_StatusTypeDef statusReceive;
-                //statusReceive = HAL_UART_Receive(&huart3, (uint8_t*)rxData, 2, 10000);//huart2
-                /////////
-                //while (i < sizeof(rxData) - 1)
-			    //{
-				///
-                status=HAL_UART_Transmit(&huart3, (uint8_t*)"11223", 5, 1000);
-                HAL_Delay(50); // 增加這個 delay，再進行接收會比較穩
-
-                i=0;
-                while (i < 5) {
-                    statusReceive = HAL_UART_Receive(&huart3, (uint8_t*)&ch, 1, 20000);//&huart2
-                    if (statusReceive == HAL_OK) {
-                        rxData[i] = ch;
-                        printf("Got char: %c\n", ch);
-                        i++;
-                    } else {
-                        printf("Timeout or error at %d chars\n", i);
-                        break;
-                    }
-                }
-                rxData[i];
-                ///////////////////////////////////////
-                /*
-                for(int i=0;i<3;)
-                    {
-						//statusReceive = HAL_UART_Receive(&huart3, (uint8_t*)&ch, 1, 15000);
-						statusReceive = HAL_UART_Receive(&huart3, (uint8_t*)rxData, 3, 5000);
-						if (statusReceive == HAL_OK)
-						{
-							rxData[i] = ch;
-							i++;
-						}
-						else
-						{
-							break; // 超時就退出
-						}
-                    }*/
-
-			    //}
-               // rxData[i] = '\0';
-
-                ////////
-                //char ch;
-                //HAL_StatusTypeDef status = HAL_UART_Receive(&huart3, (uint8_t*)&ch, 1, 10000);
-
-                if (statusReceive == HAL_OK)
-                {
-                    printf("Received: %s\n", rxData);
-                }
-                else if (statusReceive == HAL_TIMEOUT)
-                {
-                    printf("Receive timeout.\n");
-                }
-                else
-                {
-                    printf("Receive error.\n");
-                }
-                //
-                //receiveDataUart();
-                int b=33;
-
-                // 這裡可以觸發按下事件
-            }
-        }
-        else
-        {
-            lastDebounceTime = currentTime;
-            lightOffLED();//暫時加上
-        }
-    //}
-    /*else
-    {
-        if (value < FSR_THRESHOLD_RELEASE)
-        {
-            if ((currentTime - lastDebounceTime) > DEBOUNCE_DELAY_MS)
-            {
-                fsrState = FSR_RELEASED;
-                lastDebounceTime = currentTime;
-                // 這裡可以觸發放開事件
-                lightOffLED();
-            }
-        }
-        else
-        {
-            lastDebounceTime = currentTime;
-        }
-    }*/
-
-}
 int getSlidingAverageFSRValue(void)
 {
     //int raw = readSingleADCValue();
@@ -352,19 +182,7 @@ void transmitDataUart(char* bufferPtr)
 	statustransmit=HAL_UART_Transmit(&huart1, (uint8_t*)bufferPtr, strlen(bufferPtr), 1000);//&huart2
 
 }
-int slidingWindowAvg(int new_sample) {
 
-    buffer[index] = new_sample;
-    index = (index + 1) % WINDOW_SIZE;
-    if (count < WINDOW_SIZE) count++;
-
-    int sum = 0;
-    for (int i = 0; i < count; i++) {
-        sum += buffer[i];
-    }
-
-    return sum / count;
-}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
@@ -381,272 +199,13 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 }
 
 //
-uint16_t readSingleADCValue(int sensorIndex)
-{
-    HAL_StatusTypeDef status;
-    uint16_t adcValue = 0;
-    ADC_HandleTypeDef* hadc = NULL;
 
-    // 根據 sensorIndex 選擇對應 ADC
-    if (sensorIndex == 1) {
-        hadc = &hadc1;
-    } else if (sensorIndex == 2) {
-        hadc = &hadc2;
-    } else {
-    	Error_Handler();  // 加入錯誤處理
-        return 0; // 無效的 index
-    }
-
-    // 啟動 ADC
-    status = HAL_ADC_Start(hadc);
-    if (status != HAL_OK) {
-        return 0; // 啟動失敗
-    }
-
-    // 輪詢等待轉換完成
-    status = HAL_ADC_PollForConversion(hadc, 10);
-    if (status == HAL_OK) {
-        adcValue = HAL_ADC_GetValue(hadc);
-    }
-
-    return adcValue;
-}
-
-
-
-void startADCRead(ADCReadContext_t *context, int sensorIndex, uint32_t sensorPressDuration)
-{
-    (*context).sensorIndex = sensorIndex;
-    (*context).maxCount = sensorPressDuration / 10;
-    if ((*context).maxCount == 0) (*context).maxCount = 1; // 防除以0
-    (*context).sum = 0;
-    (*context).count = 0;
-    (*context).state = ADC_READ_INIT;
-}
-
-bool processADCRead(ADCReadContext_t *context)
-{
-    switch ((*context).state)
-    {
-        case ADC_READ_INIT:
-            (*context).startTime = HAL_GetTick();
-            (*context).state = ADC_READING;
-            break;
-
-        case ADC_READING:
-            if (HAL_GetTick() - (*context).startTime >= 10)  // 間隔10ms讀一次
-            {
-                uint16_t valueADC = readSingleADCValue((*context).sensorIndex);
-                (*context).sum += valueADC;
-                (*context).count++;
-                (*context).startTime = HAL_GetTick(); // 重設計時
-                if ((*context).count >= (*context).maxCount)
-                {
-                    (*context).average = (*context).sum / (*context).count;
-                    (*context).state = ADC_READ_DONE;
-                }
-            }
-            break;
-
-        case ADC_READ_DONE:
-            return true;  // 完成讀取了
-
-        default:
-            break;
-    }
-    return false;  // 尚未完成
-}
-
-uint32_t getADCReadAverage(ADCReadContext_t *context)
-{
-    return (*context).average;
-}
-
-
-//
-
-uint32_t readAveragedFSR(int sensorIndex,uint32_t sensorPressDuration)
-{
-	//非阻塞
-
-	 ADCReadContext_t adcContext = {0};
-
-	startADCRead(&adcContext, sensorIndex, sensorPressDuration);
-
-	while (!processADCRead(&adcContext))
-	{
-		// 可在這裡執行其他任務，非阻塞
-	}
-
-	return getADCReadAverage(&adcContext);
-
-    /*
-	//阻塞
-	//sensorPressDuration=30;
-
-	uint32_t sum = 0;
-	uint32_t average = 0;
-	uint32_t count = 0;
-	count=sensorPressDuration/10;
-    if (sensorPressDuration == 0)
-    {
-    	return 0;
-    }
-    for (uint32_t i = 0; i < count; i++)
-    {
-    	//count=3
-    	//i=0, 1 2
-        uint16_t valueADC = readSingleADCValue(sensorIndex); // 假設ADC為16-bit
-        sum += valueADC;
-        HAL_Delay(10);
-    }
-    average=sum / count;
-
-
-    //return average;
-     */
-
-}
 
 
 ////////
 
 
 
-bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32_t sensorPressDuration,uint32_t pressureValueThreshold)
-{
-
-	/////////// 這個函式只執行一次,他會用阻塞式的方式等兩個sensor 都做完後 才會跳出去
-	// 但是這兩個sensor在讀資料時,是用非阻塞的方式
-	//所以每個 sensor 要讀100ms ,但這個函式執行完橫,整體時間只有100ms
-	bool allForceSensorStateResult = false;
-	uint32_t forceSensor1AveragedValue = 0;
-	uint32_t forceSensor2AveragedValue = 0;
-	bool fsr1Done = false;
-	bool fsr2Done = false;
-	uint32_t startTime = HAL_GetTick();
-	// 啟動需要的感測器
-	if (isSensor1Enabled) {
-		startADCRead(&fsr1Context, 1, sensorPressDuration);
-		fsr1Done = false;
-	} else {
-		fsr1Done = true;  // 不啟用就視為已完成
-	}
-
-	if (isSensor2Enabled) {
-		startADCRead(&fsr2Context, 2, sensorPressDuration);
-		fsr2Done = false;
-	} else {
-		fsr2Done = true;  // 不啟用就視為已完成
-	}
-
-	// 非阻塞等待兩個感測器都完成
-	while (!fsr1Done || !fsr2Done)
-	{
-		if (!fsr1Done && processADCRead(&fsr1Context)) {
-			forceSensor1AveragedValue = getADCReadAverage(&fsr1Context);
-			fsr1Done = true;
-		}
-
-		if (!fsr2Done && processADCRead(&fsr2Context)) {
-			forceSensor2AveragedValue = getADCReadAverage(&fsr2Context);
-			fsr2Done = true;
-		}
-
-		// ✅ 可插入其他非阻塞任務
-	}
-
-	// 比較是否有達到閾值
-	if ((isSensor1Enabled && forceSensor1AveragedValue > pressureValueThreshold) ||
-		(isSensor2Enabled && forceSensor2AveragedValue > pressureValueThreshold)) {
-		allForceSensorStateResult = true;
-	}
-
-	return allForceSensorStateResult;
-
-
-
-	//////////
-	/*
-	bool allForceSensorStateResult=false;
-	uint32_t forceSensor1AveragedaValue=0;
-	uint32_t forceSensor2AveragedaValue=0;
-	bool fsr1Done = false;
-	bool fsr2Done = false;
-	uint32_t fsr1Value = 0;
-	uint32_t fsr2Value = 0;
-
-	if (isSensor1Enabled && isSensor2Enabled)
-	{
-		//非阻塞
-		startADCRead(&fsr1Context, 1, sensorPressDuration);
-		startADCRead(&fsr2Context, 2, sensorPressDuration);
-		fsr1Done = false;
-		fsr2Done = false;
-		while (1)
-		{
-				// 可在這裡執行其他任務，非阻塞
-
-
-			if (!fsr1Done && processADCRead(&fsr1Context)) {
-				forceSensor1AveragedaValue = getADCReadAverage(&fsr1Context);
-				fsr1Done = true;
-				//printf("FSR1 average = %lu\n", fsr1Value);
-			}
-
-			if (!fsr2Done && processADCRead(&fsr2Context)) {
-				forceSensor2AveragedaValue = getADCReadAverage(&fsr2Context);
-				fsr2Done = true;
-				printf("FSR2 average = %lu\n", fsr2Value);
-			}
-
-			// 當兩個都完成後處理資料
-			if (fsr1Done && fsr2Done)
-			{
-				if(forceSensor1AveragedaValue > pressureValueThreshold ||forceSensor2AveragedaValue > pressureValueThreshold)
-				{
-					allForceSensorStateResult=true;
-				}
-				break;
-				//printf("FSR1 = %lu, FSR2 = %lu\n", fsr1Value, fsr2Value);
-			}
-		}
-
-
-		/////////////////////
-		//forceSensor1AveragedaValue=readAveragedFSR(1,sensorPressDuration);//讀完forceSensor1AveragedaValue才會往下走
-		//forceSensor2AveragedaValue=readAveragedFSR(2,sensorPressDuration);//
-		//if(forceSensor1AveragedaValue > pressureValueThreshold ||forceSensor2AveragedaValue > pressureValueThreshold)
-		//{
-			//allForceSensorStateResult=true;
-		//}
-	     //return true; // 兩個sensor都沒啟用，回傳 false
-	}
-	else if(isSensor1Enabled)
-	{
-		forceSensor1AveragedaValue=readAveragedFSR(1,sensorPressDuration);
-		if(forceSensor1AveragedaValue > pressureValueThreshold)
-		{
-			allForceSensorStateResult=true;
-		}
-
-	}
-	else if(isSensor2Enabled)
-	{
-		forceSensor2AveragedaValue=readAveragedFSR(2,sensorPressDuration);//再改成2
-				if(forceSensor2AveragedaValue > pressureValueThreshold)
-				{
-					allForceSensorStateResult=true;
-				}
-
-	}
-	else
-	{
-		allForceSensorStateResult=false;
-	}
-	return allForceSensorStateResult;
-	*/
-}
 
 
 
@@ -661,10 +220,34 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 bool checkSwitchState(int sensorIndex,uint32_t switchDebounceDuration)
 {
 	bool isTouchSwitchPressed=false;
+	uint16_t pin = 0;
 	uint32_t static lastDebounceTime = 0;//它只會在程式執行到該行定義時 初始化一次（第一次呼叫函數時）。
     //之後每次呼叫 checkSwitchState() 時，這個變數都會保留上一次的值，不會再被重設為 0
-    static GPIO_PinState lastButtonState = GPIO_PIN_SET;//沒按下 PC8 透過電阻拉到 3.3V（邏輯高
-	GPIO_PinState currentState = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_8);//低電位
+    static GPIO_PinState lastButtonState = GPIO_PIN_SET;//沒按下 右上PC8 透過電阻拉到 3.3V（邏輯高  , 右下pc6   左上pc9  右下下 pc5
+    switch(sensorIndex) {
+            case 1:
+                pin=GPIO_PIN_8;//GPIO_PIN_8 代表第 8 位元是1(從右邊開始數第九個數字)，二進位是 0000 0001 0000 0000 (十進位 256)
+                break;
+            case 2:
+            	pin=GPIO_PIN_6;//GPIO_PIN_6 代表第 6 位元，二進位是 0000 0000 0100 0000 (十進位 64)
+                break;
+            case 3:
+            	pin=GPIO_PIN_9;//GPIO_PIN_9 代表第 9 位元，二進位是 0000 0010 0000 0000 (十進位 512)
+			    break;
+            case 4:
+            	pin=GPIO_PIN_5;//GPIO_PIN_5 代表第 5 位元，二進位是 0000 0000 0010 0000 (十進位 32)
+				break;
+
+            default:
+                // 可以回報錯誤或回傳一個預設值
+            	pin = GPIO_PIN_8;
+                break;
+        }
+
+
+    GPIO_PinState currentState=HAL_GPIO_ReadPin(GPIOC, pin);
+
+	//GPIO_PinState currentState = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_6);//低電位
 	if (currentState != lastButtonState)
 	{
 		lastDebounceTime = HAL_GetTick();  // 有變化就重設時間
@@ -681,6 +264,7 @@ bool checkSwitchState(int sensorIndex,uint32_t switchDebounceDuration)
 	}
 
 	lastButtonState = currentState;
+	return isTouchSwitchPressed;
 }
 bool getAllTouchSwitchState(bool isSwitch1Enabled,bool isSwitch2Enabled,bool isSwitch3Enabled,bool isSwitch4Enabled,uint32_t touchSwitchDebounceDuration)
 {
@@ -699,8 +283,23 @@ bool getAllTouchSwitchState(bool isSwitch1Enabled,bool isSwitch2Enabled,bool isS
 
 	if (disabledCount == 0)
 	{   //四個開關都啟用
-		isTouchSwitch1Pressed=checkSwitchState(1,touchSwitchDebounceDuration);
-		isTouchSwitch2Pressed=checkSwitchState(2,touchSwitchDebounceDuration);//再改成2
+
+		//
+		for(int i=0;i<2;i++)
+		{
+
+			isTouchSwitch1Pressed=checkSwitchState(1,touchSwitchDebounceDuration);
+			isTouchSwitch2Pressed=checkSwitchState(2,touchSwitchDebounceDuration);//再改成2
+			isTouchSwitch1Pressed=checkSwitchState(3,touchSwitchDebounceDuration);
+			isTouchSwitch2Pressed=checkSwitchState(4,touchSwitchDebounceDuration);//再改成2
+
+
+			HAL_Delay(100); // 每10毫秒檢查一次按鈕狀態
+			//isTouchSwitch1Pressed=pressed;
+		}
+
+		//
+
 
 		int pressedCount = isTouchSwitch1Pressed + isTouchSwitch2Pressed + isTouchSwitch3Pressed + isTouchSwitch4Pressed;
 		if (pressedCount >= 2) {
@@ -805,7 +404,7 @@ int main(void)
   MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
 
-
+  //SensorCode();
   /*if (HAL_UART_Transmit(&huart1, txData, sizeof(txData), 1000) != HAL_OK) {
   Error_Handler();  // 發送錯誤處理
   }*/
@@ -820,40 +419,81 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  // 全部力量感測器回傳值
+
+	  //////////
+	  /*
+	   HAL_StatusTypeDef status_transmit;
+	   HAL_StatusTypeDef statusReceive;
+	   #define RX_LEN 3
+	   uint8_t rxData[RX_LEN] = {0};
+	   //status_transmit=HAL_UART_Transmit(&huart1, (uint8_t*)"A", 1, 1000);
+	   status_transmit=HAL_UART_Transmit(&huart1, (uint8_t*)"234", RX_LEN, 1000);
+	   HAL_Delay(1000);
+	   int i = 0;
+	   while (i < RX_LEN) {
+		    HAL_Delay(1000);
+	 		statusReceive = HAL_UART_Receive(&huart3, &rxData[i], 1, 10000);
+	 		if (statusReceive == HAL_OK) {
+	 			printf("Got char: %c\n", rxData[i]);
+	 			i++;
+	 		} else {
+	 			printf("Timeout or error at %d chars\n", i);
+	 			break;
+	 		}
+	 	}
+		*/
+	   /////////
+
+
+
+
+
+
+
+
+
+
+	  //下方為同時讀取兩種感測器函式
+	  ForceSwitchSensorConfig sensorInputConfig =
+	  {
+	      true, false, 100, 3000, true, true, false, false, 50
+	  };
+	  //TwoBoolResult finalState=GetForceSwitchSensor(sensorInputConfig);
+
+	  //if(finalState.sensor1) { /* ... */ }
+	  //if(finalState.sensor2) { /* ... */ }
+	  /////////////////////////////////////////////////////
+
+	  //下方為讀取力量感測器函式//
+	  // 全部力量感測器回傳值//
 	  bool forceSensorFinalState=false;
 	  //從flash讀取力量感測器初始參數
 	  uint32_t forceSensorPressDuration = 100;
-	  uint32_t forcepPressValueThreshold = 3000; //
-	  bool isforceSensor1Enabled=true;
-	  bool isforceSensor2Enabled=true;
-	  //
+	  uint32_t forcePressValueThreshold = 3000; //
+	  bool isForceSensor1Enabled=true;
+	  bool isForceSensor2Enabled=true;
 
-	  // Touch switch enabled flags
+	  //呼叫讀取所有力量感測器數值
+	  uint32_t forceSensorStartTime = HAL_GetTick();
+
+	  //forceSensorFinalState=getAllForceSensorState(isForceSensor1Enabled,isForceSensor2Enabled,forceSensorPressDuration,forcePressValueThreshold);
+	  uint32_t forceSensorEndTime = HAL_GetTick();
+	  uint32_t forceSensorDuration = forceSensorEndTime - forceSensorStartTime;
+	  ///////////////////////////////////////////////////////
+
+	  //下方為讀取接觸開關感測器函式//
+	  // 從flash讀取Touch switch enabled flags 初始參數
 	  bool isTouchSwitch1Enabled = true;
 	  bool isTouchSwitch2Enabled = true;
 	  bool isTouchSwitch3Enabled = true;
 	  bool isTouchSwitch4Enabled = true;
-
 	  // Touch switch behavior parameters
 	  uint32_t touchSwitchDebounceDuration = 100;
 	  uint32_t touchSwitchPressThreshold = 3000;
-
-	  // Final result of all switches
+	  // 全部接袃開關回傳值
 	  bool touchSwitchFinalState = false;
-
-	  //
-	  uint32_t startTime = HAL_GetTick();
-	  forceSensorFinalState=getAllForceSensorState(isforceSensor1Enabled,isforceSensor2Enabled,forceSensorPressDuration,forcepPressValueThreshold);
-
-
-	  uint32_t endTime = HAL_GetTick();
-	  uint32_t duration = endTime - startTime;
-
-
-
-
-
+	  //呼叫讀取所有力量感測器數值
+	  uint32_t touchSwitchStartTime = HAL_GetTick();
 
 	  touchSwitchFinalState = getAllTouchSwitchState(
 	      isTouchSwitch1Enabled,
@@ -862,6 +502,16 @@ int main(void)
 	      isTouchSwitch4Enabled,
 	      touchSwitchDebounceDuration);
 	  //
+
+	  uint32_t touchSwitchEndTime = HAL_GetTick();
+	  uint32_t touchSwitchDuration = touchSwitchEndTime - touchSwitchStartTime;
+
+
+
+
+
+
+
 
 	  /*
 	  if (ledTrigger) {
@@ -895,8 +545,8 @@ int main(void)
 	  char txData[] = "12345";
 	  //char rxData[10] = "0";
 	  //char rxData[10] = { '0','0','0','0','0','0','0','0','0','0' };
-	  HAL_StatusTypeDef status_transmit;
-	  HAL_StatusTypeDef status;
+	  //HAL_StatusTypeDef status_transmit;
+	  //HAL_StatusTypeDef status;
 	  /////////////
 	  //uint8_t tx = 'H';
 	  //uint8_t rx = 0;
@@ -1311,7 +961,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
+  huart1.Init.BaudRate = 9600;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -1381,7 +1031,7 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 115200;
+  huart3.Init.BaudRate = 9600;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
@@ -1444,8 +1094,14 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PC8 */
-  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  /*Configure GPIO pins : PC6 PC8 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PC9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_9;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);

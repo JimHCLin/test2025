@@ -1,0 +1,9 @@
+../Core/Src/ForceSwitchSensor.c:37:6:lightOnLED	1
+../Core/Src/ForceSwitchSensor.c:45:6:lightOffLED	1
+../Core/Src/ForceSwitchSensor.c:57:10:readSingleADCValue	5
+../Core/Src/ForceSwitchSensor.c:88:6:startADCRead	2
+../Core/Src/ForceSwitchSensor.c:98:6:processADCRead	7
+../Core/Src/ForceSwitchSensor.c:131:10:getADCReadAverage	1
+../Core/Src/ForceSwitchSensor.c:139:10:readAveragedFSR	2
+../Core/Src/ForceSwitchSensor.c:181:6:getAllForceSensorState	13
+../Core/Src/ForceSwitchSensor.c:235:15:GetForceSwitchSensor	1
