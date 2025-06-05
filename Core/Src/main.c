@@ -43,6 +43,7 @@
 #define FSR_THRESHOLD_RELEASE 500
 #define DEBOUNCE_DELAY_MS     50
 #define WINDOW_SIZE 3
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -217,142 +218,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
 ////////////////////
 
-bool checkSwitchState(int sensorIndex,uint32_t switchDebounceDuration)
-{
-	bool isTouchSwitchPressed=false;
-	uint16_t pin = 0;
-	uint32_t static lastDebounceTime = 0;//它只會在程式執行到該行定義時 初始化一次（第一次呼叫函數時）。
-    //之後每次呼叫 checkSwitchState() 時，這個變數都會保留上一次的值，不會再被重設為 0
-    static GPIO_PinState lastButtonState = GPIO_PIN_SET;//沒按下 右上PC8 透過電阻拉到 3.3V（邏輯高  , 右下pc6   左上pc9  右下下 pc5
-    switch(sensorIndex) {
-            case 1:
-                pin=GPIO_PIN_8;//GPIO_PIN_8 代表第 8 位元是1(從右邊開始數第九個數字)，二進位是 0000 0001 0000 0000 (十進位 256)
-                break;
-            case 2:
-            	pin=GPIO_PIN_6;//GPIO_PIN_6 代表第 6 位元，二進位是 0000 0000 0100 0000 (十進位 64)
-                break;
-            case 3:
-            	pin=GPIO_PIN_9;//GPIO_PIN_9 代表第 9 位元，二進位是 0000 0010 0000 0000 (十進位 512)
-			    break;
-            case 4:
-            	pin=GPIO_PIN_5;//GPIO_PIN_5 代表第 5 位元，二進位是 0000 0000 0010 0000 (十進位 32)
-				break;
-
-            default:
-                // 可以回報錯誤或回傳一個預設值
-            	pin = GPIO_PIN_8;
-                break;
-        }
-
-
-    GPIO_PinState currentState=HAL_GPIO_ReadPin(GPIOC, pin);
-
-	//GPIO_PinState currentState = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_6);//低電位
-	if (currentState != lastButtonState)
-	{
-		lastDebounceTime = HAL_GetTick();  // 有變化就重設時間
-	}
-	uint32_t elapsed = HAL_GetTick() - lastDebounceTime;  // 算出經過了多少毫秒
-	if (elapsed > switchDebounceDuration)
-	{
-		if (currentState == GPIO_PIN_RESET)
-		{
-			// 按鈕已穩定按下，可以執行動作
-			isTouchSwitchPressed=true;
-
-		}
-	}
-
-	lastButtonState = currentState;
-	return isTouchSwitchPressed;
-}
-bool getAllTouchSwitchState(bool isSwitch1Enabled,bool isSwitch2Enabled,bool isSwitch3Enabled,bool isSwitch4Enabled,uint32_t touchSwitchDebounceDuration)
-{
-	bool allTouchSwitchStateResult=false;
-	//bool isTouchSwitch1Pressed = true;  // 開關1被按下
-	bool isTouchSwitch1Pressed = false; // 開關1沒被按下
-	bool isTouchSwitch2Pressed = false;
-	bool isTouchSwitch3Pressed = false;
-	bool isTouchSwitch4Pressed = false;
-	uint32_t forceSensor2AveragedaValue=0;
-	int disabledCount = 0;
-	if (!isSwitch1Enabled) disabledCount++;
-	if (!isSwitch2Enabled) disabledCount++;
-	if (!isSwitch3Enabled) disabledCount++;
-	if (!isSwitch4Enabled) disabledCount++;
-
-	if (disabledCount == 0)
-	{   //四個開關都啟用
-
-		//
-		for(int i=0;i<2;i++)
-		{
-
-			isTouchSwitch1Pressed=checkSwitchState(1,touchSwitchDebounceDuration);
-			isTouchSwitch2Pressed=checkSwitchState(2,touchSwitchDebounceDuration);//再改成2
-			isTouchSwitch1Pressed=checkSwitchState(3,touchSwitchDebounceDuration);
-			isTouchSwitch2Pressed=checkSwitchState(4,touchSwitchDebounceDuration);//再改成2
-
-
-			HAL_Delay(100); // 每10毫秒檢查一次按鈕狀態
-			//isTouchSwitch1Pressed=pressed;
-		}
-
-		//
-
-
-		int pressedCount = isTouchSwitch1Pressed + isTouchSwitch2Pressed + isTouchSwitch3Pressed + isTouchSwitch4Pressed;
-		if (pressedCount >= 2) {
-		    // 執行事情
-		}
-		else
-		{
-		    // 開關1沒被按下要做的事
-		}
-		//forceSensor1AveragedaValue=0;
-		//forceSensor2AveragedaValue=0;
-		//if(forceSensor1AveragedaValue > pressureValueThreshold ||forceSensor2AveragedaValue > pressureValueThreshold)
-		//{
-			//allForceSensorStateResult=true;
-		//}
-		 //return true; // 兩個sensor都沒啟用，回傳 false
-
-	}
-	else if (disabledCount == 1)
-	{
-		printf("一個 switch 不啟用\n");
-		printf("啟用的 switch 有：");
-		if (isSwitch1Enabled) printf("Switch1 ");
-
-	}
-	else if (disabledCount == 2)
-	{
-		printf("兩個 switch 不啟用\n");
-		printf("啟用的 switch 有：");
-		if (isSwitch1Enabled) printf("Switch1 ");
-		if (isSwitch2Enabled) printf("Switch2 ");
-		if (isSwitch3Enabled) printf("Switch3 ");
-		if (isSwitch4Enabled) printf("Switch4 ");
-
-	}
-	else if (disabledCount == 3) {
-		printf("三個 switch 不啟用\n");
-		printf("啟用的 switch 有：");
-		if (isSwitch1Enabled) printf("Switch1 ");
-		if (isSwitch2Enabled) printf("Switch2 ");
-		if (isSwitch3Enabled) printf("Switch3 ");
-		if (isSwitch4Enabled) printf("Switch4 ");
-
-	}
-	else if (disabledCount == 4) {
-		printf("全部 switch 都不啟用\n");
-	}
-	else {
-		printf("狀況不明\n");
-	}
-	return allTouchSwitchStateResult;
-}
-
 
 
 /* USER CODE END 0 */
@@ -444,15 +309,6 @@ int main(void)
 		*/
 	   /////////
 
-
-
-
-
-
-
-
-
-
 	  //下方為同時讀取兩種感測器函式
 	  ForceSwitchSensorConfig sensorInputConfig =
 	  {
@@ -476,7 +332,7 @@ int main(void)
 	  //呼叫讀取所有力量感測器數值
 	  uint32_t forceSensorStartTime = HAL_GetTick();
 
-	  //forceSensorFinalState=getAllForceSensorState(isForceSensor1Enabled,isForceSensor2Enabled,forceSensorPressDuration,forcePressValueThreshold);
+	  forceSensorFinalState=getAllForceSensorState(isForceSensor1Enabled,isForceSensor2Enabled,forceSensorPressDuration,forcePressValueThreshold);
 	  uint32_t forceSensorEndTime = HAL_GetTick();
 	  uint32_t forceSensorDuration = forceSensorEndTime - forceSensorStartTime;
 	  ///////////////////////////////////////////////////////
@@ -485,6 +341,9 @@ int main(void)
 	  // 從flash讀取Touch switch enabled flags 初始參數
 	  bool isTouchSwitch1Enabled = true;
 	  bool isTouchSwitch2Enabled = true;
+	  //bool isTouchSwitch2Enabled = false;
+	  //
+	  //bool isTouchSwitch3Enabled = false;
 	  bool isTouchSwitch3Enabled = true;
 	  bool isTouchSwitch4Enabled = true;
 	  // Touch switch behavior parameters
@@ -506,13 +365,6 @@ int main(void)
 	  uint32_t touchSwitchEndTime = HAL_GetTick();
 	  uint32_t touchSwitchDuration = touchSwitchEndTime - touchSwitchStartTime;
 
-
-
-
-
-
-
-
 	  /*
 	  if (ledTrigger) {
 	          HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
@@ -521,8 +373,6 @@ int main(void)
 	          ledTrigger = 0;
 	      }
 	      */
-	  //
-
 	  //HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
 
 	  //HAL_Delay(200);
@@ -530,15 +380,8 @@ int main(void)
 	  //HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
 	  //uint32_t sensor1Flag=0;
 	  //uint32_t sensor2Flag=0;
-
-
 	  //getAllTouchSwitchState();
 
-
-
-	  ///
-	  ///
-	  //snprintf(buffer, sizeof(buffer), "%d", value);
 	  //transmitDataUart(buffer);
 
 	  //

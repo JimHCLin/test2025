@@ -4,6 +4,7 @@
 ../Core/Src/ForceSwitchSensor.c:88:6:startADCRead	24	static
 ../Core/Src/ForceSwitchSensor.c:98:6:processADCRead	24	static
 ../Core/Src/ForceSwitchSensor.c:131:10:getADCReadAverage	16	static
-../Core/Src/ForceSwitchSensor.c:139:10:readAveragedFSR	48	static
-../Core/Src/ForceSwitchSensor.c:181:6:getAllForceSensorState	48	static
-../Core/Src/ForceSwitchSensor.c:235:15:GetForceSwitchSensor	56	static
+../Core/Src/ForceSwitchSensor.c:140:6:getAllForceSensorState	48	static
+../Core/Src/ForceSwitchSensor.c:198:15:GetForceSwitchSensor	56	static
+../Core/Src/ForceSwitchSensor.c:264:6:checkSwitchState	32	static
+../Core/Src/ForceSwitchSensor.c:307:6:getAllTouchSwitchState	72	static

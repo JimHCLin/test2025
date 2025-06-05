@@ -21,6 +21,8 @@
 #define FSR_THRESHOLD_RELEASE 500
 #define DEBOUNCE_DELAY_MS     50
 #define WINDOW_SIZE 3
+#define MAX_SWITCH_SENSORS 4
+#define NUM_SWITCHES 2
 /* USER CODE END PM */
 typedef enum {
     FSR_RELEASED = 0,
