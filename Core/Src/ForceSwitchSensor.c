@@ -30,8 +30,8 @@ FSR_State fsrState = FSR_RELEASED;
 
 
 //
-ADCReadContext_t fsr1Context = {0};
-ADCReadContext_t fsr2Context = {0};
+ForceSensorADCReadContext_t fsr1Context = {0};
+ForceSensorADCReadContext_t fsr2Context = {0};
 
 //////////////////////////////////
 void lightOnLED(void)
@@ -54,7 +54,7 @@ void lightOffLED(void)
     //HAL_Delay(100);
     //i++;
 }
-uint16_t readSingleADCValue(int sensorIndex)
+uint16_t readSingleForceSensorADCValue(int sensorIndex)
 {
     HAL_StatusTypeDef status;
     uint16_t adcValue = 0;
@@ -85,41 +85,57 @@ uint16_t readSingleADCValue(int sensorIndex)
     return adcValue;
 }
 
-void startADCRead(ADCReadContext_t *context, int sensorIndex, uint32_t sensorPressDuration)
+void startForceSensorADCRead(ForceSensorADCReadContext_t *context, int sensorIndex, uint32_t sensorPressDuration)
 {
     (*context).sensorIndex = sensorIndex;
     (*context).maxCount = sensorPressDuration / 10;
     if ((*context).maxCount == 0) (*context).maxCount = 1; // 防除以0
     (*context).sum = 0;
     (*context).count = 0;
-    (*context).state = ADC_READ_INIT;
+    (*context).state = FORCE_ADC_READ_INIT;
 }
 
-bool processADCRead(ADCReadContext_t *context)
+bool processForceSensorADCRead(ForceSensorADCReadContext_t *context)
 {
     switch ((*context).state)
     {
-        case ADC_READ_INIT:
-            (*context).startTime = HAL_GetTick();
-            (*context).state = ADC_READING;
+        case FORCE_ADC_READ_INIT:
+        	//
+        	(*context).firstStartTime = HAL_GetTick();
+			(*context).startTime = (*context).firstStartTime;
+			(*context).sum = 0;
+			(*context).count = 0;
+			(*context).state = FORCE_ADC_READING;
+            //(*context).state = FORCE_ADC_READING;
             break;
 
-        case ADC_READING:
+        case FORCE_ADC_READING:
+        	int a=HAL_GetTick();
             if (HAL_GetTick() - (*context).startTime >= 10)  // 間隔10ms讀一次
             {
-                uint16_t valueADC = readSingleADCValue((*context).sensorIndex);
+                uint16_t valueADC = readSingleForceSensorADCValue((*context).sensorIndex);
                 (*context).sum += valueADC;
                 (*context).count++;
                 (*context).startTime = HAL_GetTick(); // 重設計時
                 if ((*context).count >= (*context).maxCount)
                 {
                     (*context).average = (*context).sum / (*context).count;
-                    (*context).state = ADC_READ_DONE;
+                    (*context).state = FORCE_ADC_READ_DONE;
                 }
             }
+            // ✅ 加入 timeout 條件
+			if (HAL_GetTick() - (*context).firstStartTime >= (*context).maxCount * 10)
+			{
+				if ((*context).count > 0) {
+					(*context).average = (*context).sum / (*context).count;
+				} else {
+					(*context).average = 0;
+				}
+				(*context).state = FORCE_ADC_READ_DONE;
+			}
             break;
 
-        case ADC_READ_DONE:
+        case FORCE_ADC_READ_DONE:
             return true;  // 完成讀取了
 
         default:
@@ -128,7 +144,7 @@ bool processADCRead(ADCReadContext_t *context)
     return false;  // 尚未完成
 }
 
-uint32_t getADCReadAverage(ADCReadContext_t *context)
+uint32_t getForceSensorADCReadAverage(ForceSensorADCReadContext_t *context)
 {
     return (*context).average;
 }
@@ -151,14 +167,14 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 	uint32_t startTime = HAL_GetTick();
 	// 啟動需要的感測器
 	if (isSensor1Enabled) {
-		startADCRead(&fsr1Context, 1, sensorPressDuration);
+		startForceSensorADCRead(&fsr1Context, 1, sensorPressDuration);
 		fsr1Done = false;
 	} else {
 		fsr1Done = true;  // 不啟用就視為已完成
 	}
 
 	if (isSensor2Enabled) {
-		startADCRead(&fsr2Context, 2, sensorPressDuration);
+		startForceSensorADCRead(&fsr2Context, 2, sensorPressDuration);
 		fsr2Done = false;
 	} else {
 		fsr2Done = true;  // 不啟用就視為已完成
@@ -167,13 +183,13 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 	// 非阻塞等待兩個感測器都完成
 	while (!fsr1Done || !fsr2Done)
 	{
-		if (!fsr1Done && processADCRead(&fsr1Context)) {
-			forceSensor1AveragedValue = getADCReadAverage(&fsr1Context);
+		if (!fsr1Done && processForceSensorADCRead(&fsr1Context)) {
+			forceSensor1AveragedValue = getForceSensorADCReadAverage(&fsr1Context);
 			fsr1Done = true;
 		}
 
-		if (!fsr2Done && processADCRead(&fsr2Context)) {
-			forceSensor2AveragedValue = getADCReadAverage(&fsr2Context);
+		if (!fsr2Done && processForceSensorADCRead(&fsr2Context)) {
+			forceSensor2AveragedValue = getForceSensorADCReadAverage(&fsr2Context);
 			fsr2Done = true;
 		}
 
@@ -190,7 +206,7 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 	}
 	else
 	{
-		//lightOffLED();
+		lightOffLED();
 	}
 	return allForceSensorStateResult;
 }

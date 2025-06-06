@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include "stm32l4xx_hal.h"
 
 
 /* USER CODE BEGIN PM */
@@ -24,27 +25,47 @@
 #define MAX_SWITCH_SENSORS 4
 #define NUM_SWITCHES 2
 /* USER CODE END PM */
+////力量感測器
 typedef enum {
     FSR_RELEASED = 0,
 	FSR_PRESSED = 1
 } FSR_State;
 
 typedef enum {
-    ADC_READ_INIT,
-    ADC_READING,
-    ADC_READ_DONE
-} ADCReadState_t;
+    FORCE_ADC_READ_INIT,
+	FORCE_ADC_READING,
+	FORCE_ADC_READ_DONE
+} ForceSensorADCReadState_t;
 
 typedef struct {
-    ADCReadState_t state;
+	ForceSensorADCReadState_t state;
     uint32_t startTime;
+    uint32_t firstStartTime;  // <--- 新增這行
     uint32_t sum;
     uint32_t count;
     uint32_t maxCount;
     int sensorIndex;
     uint32_t average;
-} ADCReadContext_t;
+} ForceSensorADCReadContext_t;
+////力量感測器
+////接觸開關
+typedef enum {
+    TOUCH_SWITCH_IDLE,
+    TOUCH_SWITCH_DEBOUNCING,
+    TOUCH_SWITCH_PRESSED
+} TouchSwitchState;
 
+typedef struct {
+    uint8_t sensorIndex;
+    uint32_t debounceDuration;
+    uint32_t lastChangeTime;
+    GPIO_PinState lastRawState;
+    TouchSwitchState state;
+    bool isPressed;
+} TouchSwitchContext;
+////接觸開關
+
+///整體
 typedef struct {
     bool isForceSensor1Enabled;
     bool isForceSensor2Enabled;
@@ -61,16 +82,22 @@ typedef struct {
     bool sensor1;
     bool sensor2;
 } TwoBoolResult;
+///整體
+///////////實體宣告
+extern ForceSensorADCReadContext_t fsr1Context;
+extern ForceSensorADCReadContext_t fsr2Context;
 
-extern ADCReadContext_t fsr1Context;
-extern ADCReadContext_t fsr2Context;
-
-
-// 函式宣告
-TwoBoolResult GetForceSwitchSensor(ForceSwitchSensorConfig config);
-void startADCRead(ADCReadContext_t *context, int sensorIndex, uint32_t sensorPressDuration);
-bool processADCRead(ADCReadContext_t *context);
-uint32_t getADCReadAverage(ADCReadContext_t *context);
+// 函式宣告 ///力量感測器
+void startForceSensorADCRead(ForceSensorADCReadContext_t *context, int sensorIndex, uint32_t sensorPressDuration);
+bool processForceSensorADCRead(ForceSensorADCReadContext_t *context);
+uint32_t getForceSensorADCReadAverage(ForceSensorADCReadContext_t *context);
 bool getAllForceSensorState(bool isSensor1Enabled, bool isSensor2Enabled, uint32_t sensorPressDuration, uint32_t pressureValueThreshold);
+
+// 函式宣告//接觸開關
+void initTouchSwitchContext(TouchSwitchContext *ctx, uint8_t sensorIndex, uint32_t debounceDuration);
+void processTouchSwitch(TouchSwitchContext *ctx);
+
+// 函式宣告 ///整體
+TwoBoolResult GetForceSwitchSensor(ForceSwitchSensorConfig config);
 
 #endif /* INC_FORCESWITCHSENSOR_H_ */
