@@ -32,6 +32,15 @@ FSR_State fsrState = FSR_RELEASED;
 //
 ForceSensorADCReadContext_t fsr1Context = {0};
 ForceSensorADCReadContext_t fsr2Context = {0};
+//
+TouchSwitchContext touchSwitches[MAX_TOUCH_SWITCHES] = {
+    {GPIOC, GPIO_PIN_8, TOUCH_IDLE, 0, 0, 0, 0, false},
+    {GPIOC, GPIO_PIN_6, TOUCH_IDLE, 0, 0, 0, 0, false},
+    {GPIOC, GPIO_PIN_9, TOUCH_IDLE, 0, 0, 0, 0, false},
+    {GPIOC, GPIO_PIN_5, TOUCH_IDLE, 0, 0, 0, 0, false}
+};//定義變數
+//欄位依序是：GPIO port (GPIOA, GPIOB...),GPIO pin (GPIO_PIN_0, GPIO_PIN_1...),初始狀態（TOUCH_IDLE）,lastChangeTime（0）,pressStartTime（0）,lastTapTime（0）,tapCount（0）
+//longPressDetected（false）
 
 //////////////////////////////////
 void lightOnLED(void)
@@ -320,6 +329,150 @@ bool checkSwitchState(int sensorIndex, uint32_t switchDebounceDuration)
 
     return isTouchSwitchPressed;
 }
+
+void updateTouchSwitchState(TouchSwitchContext* sw, uint32_t debounceTime)
+{
+    GPIO_PinState pinState = HAL_GPIO_ReadPin((*sw).port, (*sw).pin);
+    uint32_t now = HAL_GetTick();
+
+    switch ((*sw).state)
+    {
+        case TOUCH_IDLE:
+            if (pinState == GPIO_PIN_RESET) {
+                (*sw).state = TOUCH_DEBOUNCE;
+                (*sw).lastChangeTime = now;
+            }
+            break;
+
+        case TOUCH_DEBOUNCE:
+            if ((now - (*sw).lastChangeTime) >= debounceTime) {
+                if (pinState == GPIO_PIN_RESET) {
+                    (*sw).state = TOUCH_PRESSED;
+                    (*sw).pressStartTime = now;
+                    (*sw).longPressDetected = false;
+                } else {
+                    (*sw).state = TOUCH_IDLE;
+                }
+            }
+            break;
+
+        case TOUCH_PRESSED:
+            if (pinState == GPIO_PIN_SET)
+            {
+            	//SET代表按鈕已經放開
+                (*sw).state = TOUCH_RELEASED;
+                uint32_t pressDuration = now - (*sw).pressStartTime;
+
+                if ((now - (*sw).lastTapTime) < MULTI_TAP_WINDOW)
+                {
+                	///處理快速連按
+                    (*sw).tapCount++;//快速連按計數加1
+                }
+                else
+                {
+                    (*sw).tapCount = 1;
+                }
+                (*sw).lastTapTime = now;//把當下的時間記錄在lastTapTime
+
+                if (pressDuration < SHORT_PRESS_THRESHOLD)
+                {
+                	//處理短按情況
+                    printf("短按\n");
+                }
+                else if (pressDuration >= LONG_PRESS_THRESHOLD)
+                {
+                	//處理長按請況
+                    printf("長按（釋放時判斷）\n");
+                }
+            }
+            //下面按鈕還沒放開
+            else if ((now - (*sw).pressStartTime) >= LONG_PRESS_THRESHOLD && !(*sw).longPressDetected)
+            {
+            	//按鈕按下超過1秒 且 longPressDetected是false  (沒長按的意思)
+                (*sw).longPressDetected = true;
+                printf("長按觸發\n");
+                //按鈕還按著
+                (*sw).state = TOUCH_LONG_PRESSED;
+            }
+            break;
+
+        case TOUCH_LONG_PRESSED:
+            if (pinState == GPIO_PIN_SET)
+            {
+            	//SET代表按鈕已經放開
+                (*sw).state = TOUCH_RELEASED;
+            }
+            break;
+
+        case TOUCH_RELEASED:
+            (*sw).state = TOUCH_IDLE;
+            break;
+    }
+}
+
+bool checkSwitchStateFSM(int sensorIndex, uint32_t switchDebounceDuration)
+{
+	static bool wasPressed[MAX_TOUCH_SWITCHES] = { false };  // 每個按鈕一個 flag
+	//bool triggered = false;
+	HAL_Delay(60);
+	uint32_t now = HAL_GetTick();
+	bool isTouchSwitchPressed = false;
+	updateTouchSwitchState(&touchSwitches[sensorIndex-1], switchDebounceDuration);//&touchSwitches[i]==>取締一個SWITCH的地址  第二個..
+	TouchState touchSwitchCurrentState =touchSwitches[sensorIndex-1].state;
+	if(touchSwitchCurrentState==TOUCH_PRESSED ||touchSwitchCurrentState==TOUCH_LONG_PRESSED)
+	{
+		if (!wasPressed[sensorIndex])
+		//if (!isTouchSwitchPressed)
+		{
+			// ✅ 第一次按下：觸發一次
+			//triggered = true;
+			wasPressed[sensorIndex] = true;  // 記得這次已經觸發
+			isTouchSwitchPressed=true;//有按下
+		}
+
+
+		//isTouchSwitchPressed=true;//有按下
+
+	}
+	else
+	{
+		// ✅ 鬆開：重置 flag，準備下次觸發
+		wasPressed[sensorIndex] = false;
+		isTouchSwitchPressed=false;//沒按下
+	}
+
+	return isTouchSwitchPressed;
+
+
+}
+
+void touchSensor_update(void)
+{
+    uint8_t activeTouchCount = 0;
+    uint32_t userDebounceTime = 30; // 使用者設定的防彈跳時間(ms)
+
+    for (int i = 0; i < MAX_TOUCH_SWITCHES; i++) {
+    	updateTouchSwitchState(&touchSwitches[i], userDebounceTime);//&touchSwitches[i]==>取締一個SWITCH的地址  第二個...
+
+        if (HAL_GPIO_ReadPin(touchSwitches[i].port, touchSwitches[i].pin) == GPIO_PIN_RESET) {
+            activeTouchCount++;
+        }
+    }
+
+    if (activeTouchCount >= 2) {
+           // if (!multiTouchTriggered) {
+             //   multiTouchTriggered = true;
+               // printf("⚡ 兩個以上觸控鍵同時按下\n");
+                // 這裡寫只想觸發一次的邏輯
+                //我說的是「第一次偵測到多鍵同時按下時觸發一次」，接著只要按鍵狀態維持多鍵同時按下，就不再重複觸發。
+                //等到多鍵同時按下的狀態解除（例如某個鍵鬆開，剩下一鍵或沒按），flag重置，下一次再偵測到多鍵同時按下時，又會觸發一次
+            //}
+        } else {
+            // 按鍵數回復到少於2，重置 flag
+            //multiTouchTriggered = false;
+        }
+}
+
 bool getAllTouchSwitchState(bool isSwitch1Enabled,bool isSwitch2Enabled,bool isSwitch3Enabled,bool isSwitch4Enabled,uint32_t touchSwitchDebounceDuration)
 {
 	bool switchEnabled[NUM_SWITCHES] = { isSwitch1Enabled, isSwitch2Enabled, isSwitch3Enabled, isSwitch4Enabled };
@@ -335,6 +488,7 @@ bool getAllTouchSwitchState(bool isSwitch1Enabled,bool isSwitch2Enabled,bool isS
 	uint8_t enabledSwitchIndices[NUM_SWITCHES]={0};
 	uint8_t enabledSwitchCount=0;
 	uint8_t pressedCount=0;
+	//記錄哪些SENSOR有啟動
 	for(int i=0;i<NUM_SWITCHES;i++)
 	{
 		if(switchEnabled[i])
@@ -345,7 +499,36 @@ bool getAllTouchSwitchState(bool isSwitch1Enabled,bool isSwitch2Enabled,bool isS
 	//enabledSwitchCount = 3
 
 	//enabledSwitchIndices = {2, 3, 4} 第2 ,第3和第4個 sensor有啟動
-	///////////////////////////////////
+	///
+
+	//FSM 非堵塞
+
+	for(int k=0;k<enabledSwitchCount;k++)
+	{
+		for(int i=0;i<2;i++)
+		{
+			switchPressed[enabledSwitchIndices[k]-1]=checkSwitchStateFSM(enabledSwitchIndices[k],touchSwitchDebounceDuration);
+			if(switchPressed[enabledSwitchIndices[k] - 1])
+			{
+				pressedCount++;
+			}
+		}
+	}
+	//FSM 非堵塞
+
+
+
+
+
+
+
+
+
+
+	///
+
+	/////////////////////////////////// 非阻塞 非fsm
+	/*
 	uint32_t startTime = HAL_GetTick();
 	for(int i=0;i<2;i++)//i=0==>會進去delay,i=1 ==>不會進去delay
 	{
@@ -353,8 +536,13 @@ bool getAllTouchSwitchState(bool isSwitch1Enabled,bool isSwitch2Enabled,bool isS
 		for(int j=0;j<enabledSwitchCount;j++)
 		{
 			////enabledSwitchIndices=[1,2,3,4];
-			//switchPressed[i]=checkSwitchState(enabledSwitchIndices[i],touchSwitchDebounceDuration);
+
+
+			//////////////////////////////////////////////先註解 INDEX1 是靠近FSR那顆
 			switchPressed[enabledSwitchIndices[j]-1]=checkSwitchState(enabledSwitchIndices[j],touchSwitchDebounceDuration);
+			///////////////////////////////////////////////
+
+
 			if(switchPressed[enabledSwitchIndices[j] - 1] && (i == 1))
 			{
 				pressedCount++;
@@ -374,6 +562,11 @@ bool getAllTouchSwitchState(bool isSwitch1Enabled,bool isSwitch2Enabled,bool isS
 	}
 	uint32_t endTime = HAL_GetTick();
 	uint32_t Duration = endTime - startTime;
+	/////////////////////////////////// 非阻塞 非fsm
+	*/
+
+
+
 	//uint8_t pressedFinalCount=pressedCount/2;// 因為for
 	//int a=0;
 	//////////////////////////////////

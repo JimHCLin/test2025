@@ -285,6 +285,7 @@ int main(void)
   while (1)
   {
 
+	  //touchSensor_update();
 	  //////////
 	  /*
 	   HAL_StatusTypeDef status_transmit;
