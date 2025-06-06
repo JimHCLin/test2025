@@ -140,7 +140,7 @@ uint32_t getADCReadAverage(ADCReadContext_t *context)
 bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32_t sensorPressDuration,uint32_t pressureValueThreshold)
 {
 
-	/////////// 這個函式只執行一次,他會用阻塞式的方式等兩個sensor 都做完後 才會跳出去
+	/////////// 這個函式只執行一次,他會用阻塞式的方式等兩個sensor 都做完後 才會跳出去///
 	// 但是這兩個sensor在讀資料時,是用非阻塞的方式
 	//所以每個 sensor 要讀100ms ,但這個函式執行完成,整體時間只有100ms
 	bool allForceSensorStateResult = false;
