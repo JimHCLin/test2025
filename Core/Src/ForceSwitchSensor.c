@@ -174,6 +174,11 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 	bool fsr1Done = false;
 	bool fsr2Done = false;
 	uint32_t startTime = HAL_GetTick();
+	////////
+	uint8_t countGetAllForceSensorState=0;
+	int b=0;
+	int A=0;
+	///
 	// 啟動需要的感測器
 	if (isSensor1Enabled) {
 		startForceSensorADCRead(&fsr1Context, 1, sensorPressDuration);
@@ -192,6 +197,9 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 	// 非阻塞等待兩個感測器都完成
 	while (!fsr1Done || !fsr2Done)
 	{
+		//////////先暫時加入計算時間
+		uint32_t touchSwitchStartTime = HAL_GetTick();
+		//////////////////////////
 		if (!fsr1Done && processForceSensorADCRead(&fsr1Context)) {
 			forceSensor1AveragedValue = getForceSensorADCReadAverage(&fsr1Context);
 			fsr1Done = true;
@@ -202,20 +210,38 @@ bool getAllForceSensorState(bool isSensor1Enabled ,bool isSensor2Enabled ,uint32
 			fsr2Done = true;
 		}
 
+		//////////////////先暫時加入計算時間
+		uint32_t touchSwitchEndTime = HAL_GetTick();
+		uint32_t touchSwitchDuration = touchSwitchEndTime - touchSwitchStartTime;
+
+		///
 		// ✅ 可插入其他非阻塞任務
+		//////////////先暫時加入 touch switch
+		bool touchSwitchFinalState = false;
+		touchSwitchFinalState = getAllTouchSwitchState(true,true,false,false,sensorPressDuration);
+		countGetAllForceSensorState++;
+		//////////////////////////////////
 	}
 
 	// 比較是否有達到閾值
 	if ((isSensor1Enabled && forceSensor1AveragedValue > pressureValueThreshold) ||
 		(isSensor2Enabled && forceSensor2AveragedValue > pressureValueThreshold)) {
 		allForceSensorStateResult = true;
-		lightOnLED();
+
+		//lightOnLED();
+
 		//HAL_Delay(200);
 		//lightOffLED();
+		////////
+		A=countGetAllForceSensorState;
+		int dd=0;
+		////////////////
 	}
 	else
 	{
-		lightOffLED();
+		//lightOffLED();
+		b=countGetAllForceSensorState;
+		int d=0;
 	}
 	return allForceSensorStateResult;
 }
@@ -288,6 +314,7 @@ TwoBoolResult GetForceSwitchSensor(ForceSwitchSensorConfig config)
 
 bool checkSwitchState(int sensorIndex, uint32_t switchDebounceDuration)
 {
+	//非堵塞方法 ,非FSM
     static uint32_t lastDebounceTime[MAX_SWITCH_SENSORS] = {0};
     static GPIO_PinState currentState[MAX_SWITCH_SENSORS] = {GPIO_PIN_SET, GPIO_PIN_SET, GPIO_PIN_SET, GPIO_PIN_SET};
     static GPIO_PinState lastButtonState[MAX_SWITCH_SENSORS] = {GPIO_PIN_SET, GPIO_PIN_SET, GPIO_PIN_SET, GPIO_PIN_SET};
@@ -332,6 +359,7 @@ bool checkSwitchState(int sensorIndex, uint32_t switchDebounceDuration)
 
 void updateTouchSwitchState(TouchSwitchContext* sw, uint32_t debounceTime)
 {
+	//FSM 非堵塞方法
     GPIO_PinState pinState = HAL_GPIO_ReadPin((*sw).port, (*sw).pin);
     uint32_t now = HAL_GetTick();
 
@@ -414,30 +442,41 @@ bool checkSwitchStateFSM(int sensorIndex, uint32_t switchDebounceDuration)
 {
 	static bool wasPressed[MAX_TOUCH_SWITCHES] = { false };  // 每個按鈕一個 flag
 	//bool triggered = false;
-	HAL_Delay(60);
+	//HAL_Delay(60);
 	uint32_t now = HAL_GetTick();
 	bool isTouchSwitchPressed = false;
 	updateTouchSwitchState(&touchSwitches[sensorIndex-1], switchDebounceDuration);//&touchSwitches[i]==>取締一個SWITCH的地址  第二個..
 	TouchState touchSwitchCurrentState =touchSwitches[sensorIndex-1].state;
 	if(touchSwitchCurrentState==TOUCH_PRESSED ||touchSwitchCurrentState==TOUCH_LONG_PRESSED)
 	{
-		if (!wasPressed[sensorIndex])
+		/*第一次按下：觸發一次,之後持續按下都不會再回傳TRUE
+		if (!wasPressed[sensorIndex-1])
 		//if (!isTouchSwitchPressed)
 		{
 			// ✅ 第一次按下：觸發一次
 			//triggered = true;
-			wasPressed[sensorIndex] = true;  // 記得這次已經觸發
+			wasPressed[sensorIndex-1] = true;  // 記得這次已經觸發
 			isTouchSwitchPressed=true;//有按下
 		}
+		*/ //上面  第一次按下：觸發一次,之後持續按下都不會再回傳TRUE
 
 
-		//isTouchSwitchPressed=true;//有按下
+		/////////////////
+		//每次偵測有按下都會回傳TRUE
+		if (!isTouchSwitchPressed)
+		{
+			// ✅ 第一次按下：觸發一次
+			//triggered = true;
+			//wasPressed[sensorIndex-1] = true;  // 記得這次已經觸發
+			isTouchSwitchPressed=true;//有按下
+		}
+		/////////////////////////////////
 
 	}
 	else
 	{
 		// ✅ 鬆開：重置 flag，準備下次觸發
-		wasPressed[sensorIndex] = false;
+		wasPressed[sensorIndex-1] = false;
 		isTouchSwitchPressed=false;//沒按下
 	}
 
@@ -505,14 +544,14 @@ bool getAllTouchSwitchState(bool isSwitch1Enabled,bool isSwitch2Enabled,bool isS
 
 	for(int k=0;k<enabledSwitchCount;k++)
 	{
-		for(int i=0;i<2;i++)
-		{
+		//for(int i=0;i<2;i++)
+		//{
 			switchPressed[enabledSwitchIndices[k]-1]=checkSwitchStateFSM(enabledSwitchIndices[k],touchSwitchDebounceDuration);
 			if(switchPressed[enabledSwitchIndices[k] - 1])
 			{
 				pressedCount++;
 			}
-		}
+		//}
 	}
 	//FSM 非堵塞
 

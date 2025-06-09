@@ -112,6 +112,9 @@ void initTouchSwitchContext(TouchSwitchContext *ctx, uint8_t sensorIndex, uint32
 void processTouchSwitch(TouchSwitchContext *ctx);
 void updateTouchSwitchState(TouchSwitchContext* sw, uint32_t debounceTime);
 void touchSensor_update(void);  // <- 在這宣告
+bool getAllTouchSwitchState(bool isSwitch1Enabled, bool isSwitch2Enabled,
+                            bool isSwitch3Enabled, bool isSwitch4Enabled,
+                            uint32_t touchSwitchDebounceDuration);
 // 函式宣告 ///整體
 TwoBoolResult GetForceSwitchSensor(ForceSwitchSensorConfig config);
 

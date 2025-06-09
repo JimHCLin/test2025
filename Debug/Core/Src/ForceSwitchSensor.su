@@ -4,10 +4,10 @@
 ../Core/Src/ForceSwitchSensor.c:97:6:startForceSensorADCRead	24	static
 ../Core/Src/ForceSwitchSensor.c:107:6:processForceSensorADCRead	24	static
 ../Core/Src/ForceSwitchSensor.c:156:10:getForceSensorADCReadAverage	16	static
-../Core/Src/ForceSwitchSensor.c:165:6:getAllForceSensorState	48	static
-../Core/Src/ForceSwitchSensor.c:223:15:GetForceSwitchSensor	56	static
-../Core/Src/ForceSwitchSensor.c:289:6:checkSwitchState	32	static
-../Core/Src/ForceSwitchSensor.c:333:6:updateTouchSwitchState	32	static
-../Core/Src/ForceSwitchSensor.c:413:6:checkSwitchStateFSM	32	static
-../Core/Src/ForceSwitchSensor.c:449:6:touchSensor_update	24	static
-../Core/Src/ForceSwitchSensor.c:476:6:getAllTouchSwitchState	56	static
+../Core/Src/ForceSwitchSensor.c:165:6:getAllForceSensorState	88	static
+../Core/Src/ForceSwitchSensor.c:249:15:GetForceSwitchSensor	56	static
+../Core/Src/ForceSwitchSensor.c:315:6:checkSwitchState	32	static
+../Core/Src/ForceSwitchSensor.c:360:6:updateTouchSwitchState	32	static
+../Core/Src/ForceSwitchSensor.c:441:6:checkSwitchStateFSM	32	static
+../Core/Src/ForceSwitchSensor.c:488:6:touchSensor_update	24	static
+../Core/Src/ForceSwitchSensor.c:515:6:getAllTouchSwitchState	56	static

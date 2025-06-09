@@ -5,9 +5,9 @@
 ../Core/Src/ForceSwitchSensor.c:107:6:processForceSensorADCRead	9
 ../Core/Src/ForceSwitchSensor.c:156:10:getForceSensorADCReadAverage	1
 ../Core/Src/ForceSwitchSensor.c:165:6:getAllForceSensorState	13
-../Core/Src/ForceSwitchSensor.c:223:15:GetForceSwitchSensor	1
-../Core/Src/ForceSwitchSensor.c:289:6:checkSwitchState	10
-../Core/Src/ForceSwitchSensor.c:333:6:updateTouchSwitchState	16
-../Core/Src/ForceSwitchSensor.c:413:6:checkSwitchStateFSM	4
-../Core/Src/ForceSwitchSensor.c:449:6:touchSensor_update	3
-../Core/Src/ForceSwitchSensor.c:476:6:getAllTouchSwitchState	7
+../Core/Src/ForceSwitchSensor.c:249:15:GetForceSwitchSensor	1
+../Core/Src/ForceSwitchSensor.c:315:6:checkSwitchState	10
+../Core/Src/ForceSwitchSensor.c:360:6:updateTouchSwitchState	16
+../Core/Src/ForceSwitchSensor.c:441:6:checkSwitchStateFSM	4
+../Core/Src/ForceSwitchSensor.c:488:6:touchSensor_update	3
+../Core/Src/ForceSwitchSensor.c:515:6:getAllTouchSwitchState	6

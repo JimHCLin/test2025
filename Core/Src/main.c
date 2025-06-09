@@ -333,7 +333,7 @@ int main(void)
 	  //呼叫讀取所有力量感測器數值
 	  uint32_t forceSensorStartTime = HAL_GetTick();
 
-	  //forceSensorFinalState=getAllForceSensorState(isForceSensor1Enabled,isForceSensor2Enabled,forceSensorPressDuration,forcePressValueThreshold);
+	  forceSensorFinalState=getAllForceSensorState(isForceSensor1Enabled,isForceSensor2Enabled,forceSensorPressDuration,forcePressValueThreshold);
 	  uint32_t forceSensorEndTime = HAL_GetTick();
 	  uint32_t forceSensorDuration = forceSensorEndTime - forceSensorStartTime;
 	  ///////////////////////////////////////////////////////
@@ -355,7 +355,7 @@ int main(void)
 	  //呼叫讀取所有力量感測器數值
 	  uint32_t touchSwitchStartTime = HAL_GetTick();
 
-	  touchSwitchFinalState = getAllTouchSwitchState(isTouchSwitch1Enabled,isTouchSwitch2Enabled,isTouchSwitch3Enabled,isTouchSwitch4Enabled,touchSwitchDebounceDuration);
+	  //touchSwitchFinalState = getAllTouchSwitchState(isTouchSwitch1Enabled,isTouchSwitch2Enabled,isTouchSwitch3Enabled,isTouchSwitch4Enabled,touchSwitchDebounceDuration);
 	  //
 
 	  uint32_t touchSwitchEndTime = HAL_GetTick();
@@ -470,7 +470,7 @@ int main(void)
 */
 	  // 啟用力量感測器功能
 	  //updateFSRState();   // 呼叫防彈跳判斷
-	  HAL_Delay(100);     // 簡短延遲避免過度讀取ADC
+	  HAL_Delay(50);     // 簡短延遲避免過度讀取ADC///////////////////////////////////////////////
 	  //
 	  //printf("Tick\r\n");
     /* USER CODE END WHILE */
